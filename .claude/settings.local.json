@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /d/elvin/Workspace/ESP32 -maxdepth 3 -type f 2>/dev/null)",
+      "Read(//d/elvin/Workspace/ESP32/**)"
+    ]
+  }
+}
