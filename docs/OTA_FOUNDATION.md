@@ -110,3 +110,8 @@ selection, `otadata`, reboot, pending verification, and rollback validation.
 The self-test API is not called during normal boot. When it is eventually
 triggered, it stages the copied image and reports `Reboot needed`; it does not
 restart the panel automatically.
+
+For controlled hardware bring-up, `CONFIG_HAPANEL_OTA_SELF_TEST_STAGE_FACTORY_ON_BOOT`
+can be enabled in a local `sdkconfig` build. This switch is default-off and only
+stages when the running partition is `factory`, preventing an OTA image from
+restaging itself on every boot.

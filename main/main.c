@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "nvs_flash.h"
+#include "sdkconfig.h"
 
 #include "hapanel_network.h"
 #include "hapanel_ota.h"
@@ -87,6 +88,16 @@ void app_main(void)
     if (ota_valid_result != ESP_OK && ota_valid_result != ESP_ERR_NOT_SUPPORTED) {
         ESP_LOGW(TAG, "OTA boot validation returned: %s", esp_err_to_name(ota_valid_result));
     }
+
+#if CONFIG_HAPANEL_OTA_SELF_TEST_STAGE_FACTORY_ON_BOOT
+    esp_err_t ota_self_test_result = hapanel_ota_self_test_stage_running(&runtime);
+    if (ota_self_test_result != ESP_OK) {
+        ESP_LOGW(TAG,
+                 "OTA self-test staging returned: %s",
+                 esp_err_to_name(ota_self_test_result));
+    }
+#endif
+
     hapanel_runtime_refresh_root(&runtime);
     bsp_display_unlock();
 

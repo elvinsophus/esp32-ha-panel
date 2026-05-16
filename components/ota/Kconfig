@@ -1,0 +1,15 @@
+menu "HAPanel OTA"
+
+    config HAPANEL_OTA_SELF_TEST_STAGE_FACTORY_ON_BOOT
+        bool "Stage factory image into OTA slot on boot for self-test"
+        default n
+        help
+            Development-only bring-up switch. When enabled, a boot from the
+            factory partition copies the running app image into the next OTA
+            slot through the normal OTA session API and sets that slot as the
+            next boot target.
+
+            The panel does not restart automatically. Leave this disabled for
+            normal firmware builds.
+
+endmenu

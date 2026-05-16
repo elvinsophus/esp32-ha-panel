@@ -299,6 +299,12 @@ esp_err_t hapanel_ota_self_test_stage_running(hapanel_runtime_t *runtime)
         return ESP_ERR_NOT_FOUND;
     }
 
+    if (running->subtype != ESP_PARTITION_SUBTYPE_APP_FACTORY) {
+        ESP_LOGW(TAG, "Self-test staging is only allowed from factory; running=%s", running->label);
+        set_ota_status(runtime, "Factory only", HAPANEL_SYSTEM_LEVEL_WARNING);
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
     hapanel_ota_session_t session = {0};
     esp_err_t begin_result = hapanel_ota_begin(runtime, &session, running->size);
     if (begin_result != ESP_OK) {
