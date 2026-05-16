@@ -1,0 +1,11 @@
+# Copy this file to sdkconfig.defaults.local for local hardware bring-up.
+# Do not commit sdkconfig.defaults.local; it may contain network credentials.
+
+# CONFIG_HAPANEL_WIFI_SSID="YourWiFiSSID"
+# CONFIG_HAPANEL_WIFI_PASSWORD="YourWiFiPassword"
+
+# CONFIG_HAPANEL_MQTT_BROKER_URI="mqtt://192.168.1.10:1883"
+# CONFIG_HAPANEL_MQTT_CLIENT_ID="hapanel"
+# CONFIG_HAPANEL_MQTT_USERNAME="mqtt_user"
+# CONFIG_HAPANEL_MQTT_PASSWORD="mqtt_password"
+# CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC="hapanel/status"
