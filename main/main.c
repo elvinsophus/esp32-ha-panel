@@ -83,6 +83,10 @@ void app_main(void)
     bsp_display_lock(0);
     hapanel_runtime_render_root(&runtime);
 
+    esp_err_t ota_valid_result = hapanel_ota_mark_boot_valid(&runtime);
+    if (ota_valid_result != ESP_OK && ota_valid_result != ESP_ERR_NOT_SUPPORTED) {
+        ESP_LOGW(TAG, "OTA boot validation returned: %s", esp_err_to_name(ota_valid_result));
+    }
     hapanel_runtime_refresh_root(&runtime);
     bsp_display_unlock();
 

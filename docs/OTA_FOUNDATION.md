@@ -6,15 +6,18 @@ Current behavior:
 - logs the running and configured boot partitions
 - checks whether `ota_0` and `ota_1` app slots exist
 - reports OTA status to the system status UI
+- reports OTA image state when rollback metadata exists
+- marks a pending-verify OTA image valid after display, touch, and root UI
+  initialization succeed
 
 Current limitation:
-- the active partition table is factory-only, so OTA reports `Factory only`
+- update download and installation are not implemented yet
 
 Safety boundary:
 - no image download is implemented yet
 - no flash write is implemented yet
 - no boot partition switch is implemented yet
-- no partition layout change is made by the service
+- no partition layout change is made by the service itself
 
 Before enabling real OTA updates, the partition and recovery strategy must be
 designed explicitly.
@@ -51,3 +54,14 @@ The first activation on the test panel required erasing only the new NVS region
 at `0x9000..0xcfff` after flashing the new table. The previous factory-only NVS
 partition was larger, and stale metadata prevented `nvs_flash_init()` from
 opening the resized NVS partition cleanly.
+
+## Rollback Validation
+
+`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` is enabled in `sdkconfig.defaults`.
+When a future OTA update boots from `ota_0` or `ota_1` in
+`ESP_OTA_IMG_PENDING_VERIFY`, HAPanel marks the image valid only after the
+panel has initialized PSRAM, NVS, display, touch, OTA status, and the root UI.
+
+Network and Home Assistant availability are intentionally not part of the boot
+validity gate. A panel should not roll back merely because Wi-Fi credentials are
+missing or Home Assistant is offline.

@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "hapanel_ota";
 
@@ -34,6 +35,35 @@ static void set_ota_status(hapanel_runtime_t *runtime,
     }
 
     hapanel_runtime_set_status(runtime, HAPANEL_SYSTEM_OTA, value, level);
+}
+
+static const char *ota_state_name(esp_ota_img_states_t state)
+{
+    switch (state) {
+    case ESP_OTA_IMG_NEW:
+        return "new";
+    case ESP_OTA_IMG_PENDING_VERIFY:
+        return "pending_verify";
+    case ESP_OTA_IMG_VALID:
+        return "valid";
+    case ESP_OTA_IMG_INVALID:
+        return "invalid";
+    case ESP_OTA_IMG_ABORTED:
+        return "aborted";
+    case ESP_OTA_IMG_UNDEFINED:
+    default:
+        return "undefined";
+    }
+}
+
+static esp_err_t get_running_ota_state(const esp_partition_t *running,
+                                       esp_ota_img_states_t *state)
+{
+    if (running == NULL || state == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    return esp_ota_get_state_partition(running, state);
 }
 
 esp_err_t hapanel_ota_init(hapanel_runtime_t *runtime)
@@ -75,6 +105,85 @@ esp_err_t hapanel_ota_init(hapanel_runtime_t *runtime)
         return ESP_OK;
     }
 
+#ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+    esp_ota_img_states_t running_state = ESP_OTA_IMG_UNDEFINED;
+    esp_err_t state_result = get_running_ota_state(running, &running_state);
+    if (state_result == ESP_OK) {
+        ESP_LOGI(TAG, "running OTA image state: %s", ota_state_name(running_state));
+        if (running_state == ESP_OTA_IMG_PENDING_VERIFY) {
+            set_ota_status(runtime, "Pending verify", HAPANEL_SYSTEM_LEVEL_PENDING);
+            return ESP_OK;
+        }
+    } else if (state_result != ESP_ERR_NOT_SUPPORTED && state_result != ESP_ERR_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to read running OTA image state: %s", esp_err_to_name(state_result));
+        set_ota_status(runtime, "State unknown", HAPANEL_SYSTEM_LEVEL_WARNING);
+        return ESP_OK;
+    }
+#else
+    ESP_LOGW(TAG, "OTA rollback validation is disabled in sdkconfig");
+    set_ota_status(runtime, "Rollback off", HAPANEL_SYSTEM_LEVEL_WARNING);
+    return ESP_OK;
+#endif
+
     set_ota_status(runtime, "Ready", HAPANEL_SYSTEM_LEVEL_OK);
     return ESP_OK;
+}
+
+esp_err_t hapanel_ota_mark_boot_valid(hapanel_runtime_t *runtime)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    if (running == NULL) {
+        set_ota_status(runtime, "Partition error", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+#ifndef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+    ESP_LOGW(TAG, "Skipping boot validation mark; rollback support is disabled");
+    set_ota_status(runtime, "Rollback off", HAPANEL_SYSTEM_LEVEL_WARNING);
+    return ESP_ERR_NOT_SUPPORTED;
+#else
+    esp_ota_img_states_t running_state = ESP_OTA_IMG_UNDEFINED;
+    esp_err_t state_result = get_running_ota_state(running, &running_state);
+    if (state_result == ESP_ERR_NOT_SUPPORTED || state_result == ESP_ERR_NOT_FOUND) {
+        ESP_LOGI(TAG, "Running partition has no OTA state to validate");
+        set_ota_status(runtime, "Ready", HAPANEL_SYSTEM_LEVEL_OK);
+        return ESP_OK;
+    }
+
+    if (state_result != ESP_OK) {
+        ESP_LOGW(TAG, "Unable to read running OTA state for validation: %s",
+                 esp_err_to_name(state_result));
+        set_ota_status(runtime, "State unknown", HAPANEL_SYSTEM_LEVEL_WARNING);
+        return state_result;
+    }
+
+    ESP_LOGI(TAG, "Boot validation check: running state=%s", ota_state_name(running_state));
+
+    switch (running_state) {
+    case ESP_OTA_IMG_PENDING_VERIFY: {
+        esp_err_t mark_result = esp_ota_mark_app_valid_cancel_rollback();
+        if (mark_result == ESP_OK) {
+            ESP_LOGI(TAG, "Marked running OTA image valid");
+            set_ota_status(runtime, "Validated", HAPANEL_SYSTEM_LEVEL_OK);
+        } else {
+            ESP_LOGE(TAG, "Failed to mark running OTA image valid: %s",
+                     esp_err_to_name(mark_result));
+            set_ota_status(runtime, "Validate failed", HAPANEL_SYSTEM_LEVEL_ERROR);
+        }
+        return mark_result;
+    }
+    case ESP_OTA_IMG_NEW:
+        set_ota_status(runtime, "Awaiting verify", HAPANEL_SYSTEM_LEVEL_PENDING);
+        return ESP_OK;
+    case ESP_OTA_IMG_INVALID:
+    case ESP_OTA_IMG_ABORTED:
+        set_ota_status(runtime, "Invalid image", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_FAIL;
+    case ESP_OTA_IMG_VALID:
+    case ESP_OTA_IMG_UNDEFINED:
+    default:
+        set_ota_status(runtime, "Ready", HAPANEL_SYSTEM_LEVEL_OK);
+        return ESP_OK;
+    }
+#endif
 }
