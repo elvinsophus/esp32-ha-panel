@@ -12,7 +12,7 @@ menu "HAPanel MQTT"
         string "MQTT client ID"
         default "hapanel"
         help
-            MQTT client identifier used when the broker client is enabled.
+            MQTT client identifier used when connecting to the broker.
 
     config HAPANEL_MQTT_USERNAME
         string "MQTT username"

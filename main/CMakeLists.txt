@@ -6,7 +6,7 @@ idf_component_register(
     REQUIRES
         esp_psram
         heap
-        mqtt
+        mqtt_service
         network
         nvs_flash
         ota
