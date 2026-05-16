@@ -9,6 +9,8 @@ Current behavior:
 - reports OTA image state when rollback metadata exists
 - marks a pending-verify OTA image valid after display, touch, and root UI
   initialization succeed
+- runs an OTA preflight check that selects the next update slot and blocks
+  updates while the running image still needs validation
 
 Current limitation:
 - update download and installation are not implemented yet
@@ -65,3 +67,14 @@ panel has initialized PSRAM, NVS, display, touch, OTA status, and the root UI.
 Network and Home Assistant availability are intentionally not part of the boot
 validity gate. A panel should not roll back merely because Wi-Fi credentials are
 missing or Home Assistant is offline.
+
+## Update Preflight
+
+`hapanel_ota_preflight()` is the safe gate that future MQTT, HTTP, or local
+update triggers must pass before starting an OTA write. It reports:
+- whether an update may start
+- why it is blocked, if blocked
+- the currently running app partition
+- the target OTA slot, address, and size
+
+The preflight does not erase, write, download, or switch boot partitions.

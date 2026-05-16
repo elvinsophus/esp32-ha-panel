@@ -2,6 +2,7 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "esp_log.h"
 #include "esp_ota_ops.h"
@@ -66,6 +67,77 @@ static esp_err_t get_running_ota_state(const esp_partition_t *running,
     return esp_ota_get_state_partition(running, state);
 }
 
+static void set_preflight_result(hapanel_ota_preflight_t *preflight,
+                                 bool allowed,
+                                 const char *reason,
+                                 const esp_partition_t *running,
+                                 const esp_partition_t *target)
+{
+    preflight->allowed = allowed;
+    preflight->reason = reason;
+    preflight->running_label = running != NULL ? running->label : NULL;
+    preflight->target_label = target != NULL ? target->label : NULL;
+    preflight->target_address = target != NULL ? target->address : 0;
+    preflight->target_size = target != NULL ? target->size : 0;
+}
+
+static void log_preflight(const hapanel_ota_preflight_t *preflight)
+{
+    ESP_LOGI(TAG,
+             "OTA preflight: allowed=%s reason=%s running=%s target=%s address=0x%06" PRIx32
+             " size=0x%06" PRIx32,
+             preflight->allowed ? "yes" : "no",
+             preflight->reason,
+             preflight->running_label != NULL ? preflight->running_label : "none",
+             preflight->target_label != NULL ? preflight->target_label : "none",
+             preflight->target_address,
+             preflight->target_size);
+}
+
+esp_err_t hapanel_ota_preflight(hapanel_ota_preflight_t *preflight)
+{
+    if (preflight == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *preflight = (hapanel_ota_preflight_t){0};
+
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    if (running == NULL) {
+        set_preflight_result(preflight, false, "no running partition", NULL, NULL);
+        log_preflight(preflight);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    const esp_partition_t *target = esp_ota_get_next_update_partition(NULL);
+    if (target == NULL) {
+        set_preflight_result(preflight, false, "no update slot", running, NULL);
+        log_preflight(preflight);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+#ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+    esp_ota_img_states_t running_state = ESP_OTA_IMG_UNDEFINED;
+    esp_err_t state_result = get_running_ota_state(running, &running_state);
+    if (state_result == ESP_OK && running_state == ESP_OTA_IMG_PENDING_VERIFY) {
+        set_preflight_result(preflight, false, "running image pending verification", running, target);
+        log_preflight(preflight);
+        return ESP_ERR_OTA_ROLLBACK_INVALID_STATE;
+    }
+
+    if (state_result != ESP_OK && state_result != ESP_ERR_NOT_SUPPORTED &&
+        state_result != ESP_ERR_NOT_FOUND) {
+        set_preflight_result(preflight, false, "running state unavailable", running, target);
+        log_preflight(preflight);
+        return state_result;
+    }
+#endif
+
+    set_preflight_result(preflight, true, "ready", running, target);
+    log_preflight(preflight);
+    return ESP_OK;
+}
+
 esp_err_t hapanel_ota_init(hapanel_runtime_t *runtime)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -103,6 +175,14 @@ esp_err_t hapanel_ota_init(hapanel_runtime_t *runtime)
         ESP_LOGW(TAG, "OTA update slots are not configured; firmware is factory-only for now");
         set_ota_status(runtime, "Factory only", HAPANEL_SYSTEM_LEVEL_WARNING);
         return ESP_OK;
+    }
+
+    hapanel_ota_preflight_t preflight;
+    esp_err_t preflight_result = hapanel_ota_preflight(&preflight);
+    if (preflight_result == ESP_OK) {
+        ESP_LOGI(TAG, "Next OTA update target: %s", preflight.target_label);
+    } else {
+        ESP_LOGW(TAG, "OTA preflight is not ready: %s", preflight.reason);
     }
 
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
