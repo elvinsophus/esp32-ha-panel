@@ -7,6 +7,7 @@
 #include "nvs_flash.h"
 #include "sdkconfig.h"
 
+#include "hapanel_mqtt.h"
 #include "hapanel_network.h"
 #include "hapanel_ota.h"
 #include "hapanel_profile.h"
@@ -106,5 +107,10 @@ void app_main(void)
     esp_err_t network_result = hapanel_network_start(&runtime);
     if (network_result != ESP_OK) {
         ESP_LOGW(TAG, "Network start returned: %s", esp_err_to_name(network_result));
+    }
+
+    esp_err_t mqtt_result = hapanel_mqtt_start(&runtime);
+    if (mqtt_result != ESP_OK && mqtt_result != ESP_ERR_NOT_SUPPORTED) {
+        ESP_LOGW(TAG, "MQTT start returned: %s", esp_err_to_name(mqtt_result));
     }
 }

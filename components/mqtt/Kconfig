@@ -1,0 +1,31 @@
+menu "HAPanel MQTT"
+
+    config HAPANEL_MQTT_BROKER_URI
+        string "MQTT broker URI"
+        default ""
+        help
+            Optional MQTT broker URI for early Home Assistant bring-up, for
+            example mqtt://192.168.1.10:1883. Leave empty until runtime
+            provisioning exists.
+
+    config HAPANEL_MQTT_CLIENT_ID
+        string "MQTT client ID"
+        default "hapanel"
+        help
+            MQTT client identifier used when the broker client is enabled.
+
+    config HAPANEL_MQTT_USERNAME
+        string "MQTT username"
+        default ""
+        help
+            Optional MQTT username. Avoid committing local credentials into
+            sdkconfig defaults.
+
+    config HAPANEL_MQTT_PASSWORD
+        string "MQTT password"
+        default ""
+        help
+            Optional MQTT password. Avoid committing local credentials into
+            sdkconfig defaults.
+
+endmenu
