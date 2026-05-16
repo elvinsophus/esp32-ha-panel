@@ -120,7 +120,7 @@ static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *
 
     create_label(left, item->label, &lv_font_montserrat_16, lv_color_hex(0xb7c1cd));
     lv_obj_t *value = create_label(row, item->value, &lv_font_montserrat_16,
-                                   lv_color_hex(0xf2f6fa));
+                                   color_for_status(item->level));
 
     if (index < HAPANEL_UI_STATUS_MAX_ITEMS) {
         root_view.status_dots[index] = dot;
@@ -224,6 +224,9 @@ void hapanel_ui_refresh_root(const hapanel_ui_status_t *status)
     for (size_t i = 0; i < row_count; ++i) {
         if (root_view.status_values[i] != NULL) {
             lv_label_set_text(root_view.status_values[i], status->items[i].value);
+            lv_obj_set_style_text_color(root_view.status_values[i],
+                                        color_for_status(status->items[i].level),
+                                        0);
         }
 
         if (root_view.status_dots[i] != NULL) {

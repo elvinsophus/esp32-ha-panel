@@ -1,18 +1,23 @@
 #include "hapanel_network.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_netif_ip_addr.h"
 #include "esp_wifi.h"
 
 static const char *TAG = "hapanel_network";
+static const size_t WIFI_STATUS_MAX_TEXT_BYTES = 28;
 
 static hapanel_runtime_t *network_runtime;
 static bool netif_ready;
 static bool wifi_started;
 static esp_netif_t *sta_netif;
+static char connected_ssid[33];
+static char connected_wifi_status[64];
 
 static void set_wifi_status(const char *value, hapanel_system_level_t level)
 {
@@ -37,6 +42,43 @@ static const char *disconnect_reason_name(uint8_t reason)
     }
 }
 
+static void copy_connected_ssid(const wifi_event_sta_connected_t *connected)
+{
+    if (connected == NULL) {
+        connected_ssid[0] = '\0';
+        return;
+    }
+
+    const size_t ssid_len = connected->ssid_len < sizeof(connected_ssid) - 1
+                                ? connected->ssid_len
+                                : sizeof(connected_ssid) - 1;
+    memcpy(connected_ssid, connected->ssid, ssid_len);
+    connected_ssid[ssid_len] = '\0';
+}
+
+static const char *format_connected_status(const ip_event_got_ip_t *ip_event)
+{
+    const char *ssid = connected_ssid[0] != '\0' ? connected_ssid : CONFIG_HAPANEL_WIFI_SSID;
+
+    char ip_text[16] = {0};
+    if (ip_event != NULL) {
+        snprintf(ip_text, sizeof(ip_text), IPSTR, IP2STR(&ip_event->ip_info.ip));
+    }
+
+    if (ip_text[0] != '\0' &&
+        strlen(ssid) + 1 + strlen(ip_text) <= WIFI_STATUS_MAX_TEXT_BYTES) {
+        snprintf(connected_wifi_status,
+                 sizeof(connected_wifi_status),
+                 "%s %s",
+                 ssid,
+                 ip_text);
+    } else {
+        snprintf(connected_wifi_status, sizeof(connected_wifi_status), "%s", ssid);
+    }
+
+    return connected_wifi_status;
+}
+
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id,
                                void *event_data)
 {
@@ -50,11 +92,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             ESP_LOGW(TAG, "Wi-Fi connect failed: %s", esp_err_to_name(err));
             set_wifi_status("Connect failed", HAPANEL_SYSTEM_LEVEL_WARNING);
         }
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
+        copy_connected_ssid((const wifi_event_sta_connected_t *)event_data);
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         const wifi_event_sta_disconnected_t *disconnected =
             (const wifi_event_sta_disconnected_t *)event_data;
         ESP_LOGW(TAG, "Wi-Fi disconnected: reason=%d (%s)", disconnected->reason,
                  disconnect_reason_name(disconnected->reason));
+        connected_ssid[0] = '\0';
+        connected_wifi_status[0] = '\0';
         set_wifi_status("Disconnected", HAPANEL_SYSTEM_LEVEL_OFFLINE);
         esp_err_t err = esp_wifi_connect();
         if (err != ESP_OK) {
@@ -62,8 +108,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             set_wifi_status("Reconnect failed", HAPANEL_SYSTEM_LEVEL_WARNING);
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        const ip_event_got_ip_t *got_ip = (const ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "Wi-Fi obtained an IP address");
-        set_wifi_status("Connected", HAPANEL_SYSTEM_LEVEL_OK);
+        set_wifi_status(format_connected_status(got_ip), HAPANEL_SYSTEM_LEVEL_OK);
     }
 }
 
