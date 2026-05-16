@@ -94,7 +94,7 @@ static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *
     lv_obj_t *row = lv_obj_create(parent);
     lv_obj_remove_style_all(row);
     lv_obj_set_width(row, LV_PCT(100));
-    lv_obj_set_height(row, 42);
+    lv_obj_set_height(row, 30);
     lv_obj_set_style_pad_hor(row, 0, 0);
     lv_obj_set_layout(row, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
@@ -109,7 +109,7 @@ static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *
     lv_obj_set_flex_flow(left, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(left, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(left, 12, 0);
+    lv_obj_set_style_pad_column(left, 10, 0);
 
     lv_obj_t *dot = lv_obj_create(left);
     lv_obj_remove_style_all(dot);
@@ -136,13 +136,13 @@ static lv_obj_t *create_panel(lv_obj_t *parent)
     lv_obj_remove_style_all(panel);
     lv_obj_set_width(panel, LV_PCT(100));
     lv_obj_set_height(panel, LV_SIZE_CONTENT);
-    lv_obj_set_style_pad_all(panel, profile->spacing.md, 0);
+    lv_obj_set_style_pad_all(panel, profile->spacing.sm, 0);
     lv_obj_set_style_radius(panel, profile->radius.sm, 0);
     lv_obj_set_style_bg_color(panel, lv_color_hex(profile->theme.surface), 0);
     lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(panel, 1, 0);
     lv_obj_set_style_border_color(panel, lv_color_hex(profile->theme.surface_border), 0);
-    configure_column(panel, profile->spacing.xs);
+    configure_column(panel, 4);
     return panel;
 }
 
@@ -160,19 +160,19 @@ void hapanel_ui_show_root(const hapanel_ui_status_t *status)
     lv_obj_t *root = lv_obj_create(screen);
     lv_obj_remove_style_all(root);
     lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_pad_all(root, profile->spacing.md, 0);
-    configure_column(root, profile->spacing.md);
+    lv_obj_set_style_pad_all(root, profile->spacing.sm, 0);
+    configure_column(root, profile->spacing.sm);
 
     create_status_bar(root, status);
 
     lv_obj_t *hero = lv_obj_create(root);
     lv_obj_remove_style_all(hero);
     lv_obj_set_width(hero, LV_PCT(100));
-    lv_obj_set_height(hero, 132);
+    lv_obj_set_height(hero, 72);
     lv_obj_set_layout(hero, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(hero, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(hero, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(hero, 10, 0);
+    lv_obj_set_style_pad_row(hero, 4, 0);
 
     create_label(hero, "HAPanel", &lv_font_montserrat_26, lv_color_hex(profile->theme.text_primary));
     create_label(hero, profile->board.name, &lv_font_montserrat_16,

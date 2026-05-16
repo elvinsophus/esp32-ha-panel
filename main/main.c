@@ -7,6 +7,7 @@
 #include "nvs_flash.h"
 
 #include "hapanel_network.h"
+#include "hapanel_profile.h"
 #include "hapanel_runtime.h"
 
 static const char *TAG = "hapanel";
@@ -27,6 +28,25 @@ void app_main(void)
 
     hapanel_runtime_t runtime;
     hapanel_runtime_init(&runtime);
+
+    const hapanel_profile_t *profile = hapanel_profile_active();
+    ESP_LOGI(TAG,
+             "Active profile: board=%s layout=%s display=%ux%u performance=%s theme=%s",
+             profile->board.id,
+             profile->layout.id,
+             profile->layout.width,
+             profile->layout.height,
+             profile->performance.id,
+             profile->theme.id);
+    ESP_LOGI(TAG,
+             "Test hardware: mcu=%s flash=%uMB psram=%uMB display=%s touch=%s",
+             profile->board.mcu,
+             profile->board.flash_mb,
+             profile->board.psram_mb,
+             profile->board.display,
+             profile->board.touch);
+    hapanel_runtime_set_status(&runtime, HAPANEL_SYSTEM_PROFILE, profile->layout.id,
+                               HAPANEL_SYSTEM_LEVEL_OK);
 
     esp_err_t nvs_result = nvs_flash_init();
     if (nvs_result == ESP_ERR_NVS_NO_FREE_PAGES || nvs_result == ESP_ERR_NVS_NEW_VERSION_FOUND) {

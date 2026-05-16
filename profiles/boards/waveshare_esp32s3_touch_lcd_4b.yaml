@@ -1,1 +1,6 @@
 name: Waveshare ESP32-S3-Touch-LCD-4B
+mcu: ESP32-S3
+flash_mb: 16
+psram_mb: 8
+display: 480x480 RGB LCD
+touch: GT911

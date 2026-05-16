@@ -7,6 +7,11 @@ typedef struct {
 } hapanel_system_status_default_t;
 
 static const hapanel_system_status_default_t DEFAULT_STATUS[HAPANEL_SYSTEM_STATUS_COUNT] = {
+    [HAPANEL_SYSTEM_PROFILE] = {
+        .label = "Profile",
+        .initial_value = "Resolving",
+        .initial_level = HAPANEL_SYSTEM_LEVEL_PENDING,
+    },
     [HAPANEL_SYSTEM_DISPLAY] = {
         .label = "Display",
         .initial_value = "Initializing",

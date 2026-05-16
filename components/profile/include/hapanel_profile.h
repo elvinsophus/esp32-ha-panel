@@ -5,6 +5,11 @@
 typedef struct {
     const char *id;
     const char *name;
+    const char *mcu;
+    const char *display;
+    const char *touch;
+    uint8_t flash_mb;
+    uint8_t psram_mb;
 } hapanel_board_profile_t;
 
 typedef struct {

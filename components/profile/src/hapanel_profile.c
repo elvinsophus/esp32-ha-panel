@@ -4,6 +4,11 @@ static const hapanel_profile_t active_profile = {
     .board = {
         .id = "waveshare_esp32s3_touch_lcd_4b",
         .name = "Waveshare ESP32-S3-Touch-LCD-4B",
+        .mcu = "ESP32-S3",
+        .display = "480x480 RGB LCD",
+        .touch = "GT911",
+        .flash_mb = 16,
+        .psram_mb = 8,
     },
     .layout = {
         .id = "square_480",

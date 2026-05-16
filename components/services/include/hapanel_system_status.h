@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 typedef enum {
+    HAPANEL_SYSTEM_PROFILE,
     HAPANEL_SYSTEM_DISPLAY,
     HAPANEL_SYSTEM_TOUCH,
     HAPANEL_SYSTEM_STORAGE,
