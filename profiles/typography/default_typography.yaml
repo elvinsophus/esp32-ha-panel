@@ -1,0 +1,54 @@
+encoding: utf-8
+
+font_policy:
+  full_unicode: false
+  missing_glyph_logging: true
+  fallback_required_for_dynamic_text: true
+
+fonts:
+  ui_primary:
+    role: static_ui
+    preferred_style: elegant_sans
+    coverage:
+      - ascii
+      - latin_1_supplement
+      - latin_extended_a
+      - common_punctuation
+      - common_units
+
+  dynamic_text:
+    role: external_dynamic_text
+    fallback_chain:
+      - ui_primary
+      - symbols_subset
+      - cjk_simplified_subset
+      - replacement
+
+  assistant_text:
+    role: ai_response_text
+    fallback_chain:
+      - ui_primary
+      - symbols_subset
+      - cjk_simplified_subset
+      - replacement
+
+surfaces:
+  static_ui:
+    use_fallback: false
+
+  wifi_ssid:
+    use_fallback: true
+    allow_truncation: true
+    log_missing_glyphs: true
+
+  ai_subtitle:
+    use_fallback: true
+    allow_wrapping: true
+    allow_truncation: true
+    log_missing_glyphs: true
+
+  notifications:
+    use_fallback: true
+    allow_wrapping: true
+    allow_truncation: true
+    log_missing_glyphs: true

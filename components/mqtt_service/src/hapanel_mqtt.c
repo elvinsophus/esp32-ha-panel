@@ -90,7 +90,7 @@ static void mqtt_event_handler(void *handler_args,
                                 0,
                                 0,
                                 1);
-        set_mqtt_status("Connected", HAPANEL_SYSTEM_LEVEL_OK);
+        set_mqtt_status(CONFIG_HAPANEL_MQTT_BROKER_URI, HAPANEL_SYSTEM_LEVEL_OK);
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGW(TAG, "MQTT disconnected");

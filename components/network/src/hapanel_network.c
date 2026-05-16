@@ -69,7 +69,7 @@ static const char *format_connected_status(const ip_event_got_ip_t *ip_event)
         strlen(ssid) + 1 + strlen(ip_text) <= WIFI_STATUS_MAX_TEXT_BYTES) {
         snprintf(connected_wifi_status,
                  sizeof(connected_wifi_status),
-                 "%s %s",
+                 "%s (%s)",
                  ssid,
                  ip_text);
     } else {

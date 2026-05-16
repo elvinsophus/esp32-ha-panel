@@ -79,24 +79,14 @@ static bool decode_utf8_next(const char *text, size_t *offset, uint32_t *codepoi
     }
 
     *offset += length;
-    if (!missing_log_capacity_warned) {
-        ESP_LOGW(TAG, "missing glyph log capacity reached; suppressing additional codepoints");
-        missing_log_capacity_warned = true;
-    }
-
-    return false;
+    return true;
 }
 
 static bool font_chain_has_glyph(const lv_font_t *font, uint32_t codepoint)
 {
-    for (const lv_font_t *candidate = font; candidate != NULL; candidate = candidate->fallback) {
-        lv_font_glyph_dsc_t glyph = {0};
-        if (candidate->get_glyph_dsc(candidate, &glyph, codepoint, 0) && !glyph.is_placeholder) {
-            return true;
-        }
-    }
-
-    return false;
+    lv_font_glyph_dsc_t glyph = {0};
+    return lv_font_get_glyph_dsc(font, &glyph, codepoint, 0) && glyph.resolved_font != NULL &&
+           !glyph.is_placeholder;
 }
 
 static bool should_log_missing_codepoint(uint32_t codepoint)
@@ -116,7 +106,18 @@ static bool should_log_missing_codepoint(uint32_t codepoint)
         }
     }
 
-    return true;
+    if (!missing_log_capacity_warned) {
+        ESP_LOGW(TAG, "missing glyph log capacity reached; suppressing additional codepoints");
+        missing_log_capacity_warned = true;
+    }
+
+    return false;
+}
+
+static bool is_dynamic_font_known_coverage(uint32_t codepoint)
+{
+    return (codepoint >= 0x20 && codepoint <= 0x7e) ||
+           (codepoint >= 0xa0 && codepoint <= 0x17f);
 }
 
 const lv_font_t *hapanel_ui_font_static_12(void)
@@ -157,6 +158,10 @@ void hapanel_ui_font_log_missing_glyphs(const char *surface, const char *text,
 
     while (decode_utf8_next(text, &offset, &codepoint)) {
         if (codepoint == 0 || codepoint == '\n' || codepoint == '\r' || codepoint == '\t') {
+            continue;
+        }
+
+        if (is_dynamic_font_known_coverage(codepoint)) {
             continue;
         }
 
