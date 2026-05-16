@@ -14,6 +14,7 @@
 #include "hapanel_runtime.h"
 
 static const char *TAG = "hapanel";
+static hapanel_runtime_t runtime;
 
 static void refresh_root_ui(void *context)
 {
@@ -29,7 +30,6 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "Starting HAPanel firmware");
 
-    hapanel_runtime_t runtime;
     hapanel_runtime_init(&runtime);
 
     const hapanel_profile_t *profile = hapanel_profile_active();
