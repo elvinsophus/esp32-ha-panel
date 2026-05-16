@@ -160,7 +160,9 @@ void hapanel_ui_show_root(const hapanel_ui_status_t *status)
     lv_obj_t *root = lv_obj_create(screen);
     lv_obj_remove_style_all(root);
     lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_pad_all(root, profile->spacing.sm, 0);
+    lv_obj_set_style_pad_hor(root, profile->spacing.sm, 0);
+    lv_obj_set_style_pad_bottom(root, profile->spacing.sm, 0);
+    lv_obj_set_style_pad_top(root, 0, 0);
     configure_column(root, profile->spacing.sm);
 
     create_status_bar(root, status);
