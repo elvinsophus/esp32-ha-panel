@@ -50,6 +50,14 @@ static lv_obj_t *create_label(lv_obj_t *parent, const char *text, const lv_font_
     return label;
 }
 
+static lv_obj_t *create_dynamic_label(lv_obj_t *parent, const char *surface, const char *text,
+                                      lv_color_t color)
+{
+    const lv_font_t *font = hapanel_ui_font_dynamic_16();
+    hapanel_ui_font_log_missing_glyphs(surface, text, font);
+    return create_label(parent, text, font, color);
+}
+
 static void configure_column(lv_obj_t *obj, int32_t row_gap)
 {
     lv_obj_set_layout(obj, LV_LAYOUT_FLEX);
@@ -121,8 +129,8 @@ static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *
     lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
 
     create_label(left, item->label, hapanel_ui_font_static_16(), lv_color_hex(0xb7c1cd));
-    lv_obj_t *value = create_label(row, item->value, hapanel_ui_font_dynamic_16(),
-                                   color_for_status(item->level));
+    lv_obj_t *value = create_dynamic_label(row, item->label, item->value,
+                                           color_for_status(item->level));
 
     if (index < HAPANEL_UI_STATUS_MAX_ITEMS) {
         root_view.status_dots[index] = dot;
@@ -226,6 +234,8 @@ void hapanel_ui_refresh_root(const hapanel_ui_status_t *status)
                                  : root_view.row_count;
     for (size_t i = 0; i < row_count; ++i) {
         if (root_view.status_values[i] != NULL) {
+            hapanel_ui_font_log_missing_glyphs(status->items[i].label, status->items[i].value,
+                                              hapanel_ui_font_dynamic_16());
             lv_label_set_text(root_view.status_values[i], status->items[i].value);
             lv_obj_set_style_text_color(root_view.status_values[i],
                                         color_for_status(status->items[i].level),
