@@ -1,0 +1,91 @@
+#include "hapanel_runtime.h"
+
+#include "hapanel_ui.h"
+
+static hapanel_ui_status_level_t ui_level_from_system(hapanel_system_level_t level)
+{
+    switch (level) {
+    case HAPANEL_SYSTEM_LEVEL_OK:
+        return HAPANEL_UI_STATUS_OK;
+    case HAPANEL_SYSTEM_LEVEL_PENDING:
+        return HAPANEL_UI_STATUS_PENDING;
+    case HAPANEL_SYSTEM_LEVEL_WARNING:
+        return HAPANEL_UI_STATUS_WARNING;
+    case HAPANEL_SYSTEM_LEVEL_ERROR:
+        return HAPANEL_UI_STATUS_ERROR;
+    case HAPANEL_SYSTEM_LEVEL_OFFLINE:
+    default:
+        return HAPANEL_UI_STATUS_OFFLINE;
+    }
+}
+
+static void sync_ui_status(hapanel_runtime_t *runtime)
+{
+    const hapanel_system_status_t *system_status = &runtime->system_status;
+
+    for (size_t i = 0; i < system_status->item_count; ++i) {
+        runtime->ui_items[i].label = system_status->items[i].label;
+        runtime->ui_items[i].value = system_status->items[i].value;
+        runtime->ui_items[i].level = ui_level_from_system(system_status->items[i].level);
+    }
+
+    runtime->ui_status.items = runtime->ui_items;
+    runtime->ui_status.item_count = system_status->item_count;
+    runtime->ui_status.psram_ready = system_status->psram_ready;
+}
+
+void hapanel_runtime_init(hapanel_runtime_t *runtime)
+{
+    if (runtime == NULL) {
+        return;
+    }
+
+    *runtime = (hapanel_runtime_t){0};
+    hapanel_system_status_init(&runtime->system_status);
+    sync_ui_status(runtime);
+}
+
+void hapanel_runtime_set_psram_ready(hapanel_runtime_t *runtime, bool ready)
+{
+    if (runtime == NULL) {
+        return;
+    }
+
+    hapanel_system_status_set_psram_ready(&runtime->system_status, ready);
+}
+
+void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
+                                hapanel_system_subsystem_t subsystem,
+                                const char *value,
+                                hapanel_system_level_t level)
+{
+    if (runtime == NULL) {
+        return;
+    }
+
+    hapanel_system_status_set(&runtime->system_status, subsystem, value, level);
+}
+
+void hapanel_runtime_render_root(hapanel_runtime_t *runtime)
+{
+    if (runtime == NULL) {
+        return;
+    }
+
+    sync_ui_status(runtime);
+    hapanel_ui_show_root(&runtime->ui_status);
+    runtime->rendered_revision = runtime->system_status.revision;
+    runtime->root_visible = true;
+}
+
+void hapanel_runtime_refresh_root(hapanel_runtime_t *runtime)
+{
+    if (runtime == NULL || !runtime->root_visible ||
+        runtime->rendered_revision == runtime->system_status.revision) {
+        return;
+    }
+
+    sync_ui_status(runtime);
+    hapanel_ui_refresh_root(&runtime->ui_status);
+    runtime->rendered_revision = runtime->system_status.revision;
+}

@@ -47,6 +47,7 @@ void hapanel_system_status_init(hapanel_system_status_t *status)
 
     status->item_count = HAPANEL_SYSTEM_STATUS_COUNT;
     status->psram_ready = false;
+    status->revision = 1;
 
     for (size_t i = 0; i < HAPANEL_SYSTEM_STATUS_COUNT; ++i) {
         status->items[i].label = DEFAULT_STATUS[i].label;
@@ -61,7 +62,12 @@ void hapanel_system_status_set_psram_ready(hapanel_system_status_t *status, bool
         return;
     }
 
+    if (status->psram_ready == ready) {
+        return;
+    }
+
     status->psram_ready = ready;
+    status->revision++;
 }
 
 void hapanel_system_status_set(hapanel_system_status_t *status,
@@ -73,6 +79,11 @@ void hapanel_system_status_set(hapanel_system_status_t *status,
         return;
     }
 
+    if (status->items[subsystem].value == value && status->items[subsystem].level == level) {
+        return;
+    }
+
     status->items[subsystem].value = value;
     status->items[subsystem].level = level;
+    status->revision++;
 }

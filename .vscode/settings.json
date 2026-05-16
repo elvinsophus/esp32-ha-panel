@@ -1,3 +1,10 @@
 {
-    "idf.currentSetup": "C:\\esp\\v6.0.1\\esp-idf"
+    "idf.currentSetup": "C:\\esp\\v6.0.1\\esp-idf",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+    "C_Cpp.default.compilerPath": "C:\\Espressif\\tools\\xtensa-esp-elf\\esp-15.2.0_20251204\\xtensa-esp-elf\\bin\\xtensa-esp32s3-elf-gcc.exe",
+    "C_Cpp.default.cStandard": "c23",
+    "C_Cpp.default.intelliSenseMode": "gcc-x64",
+    "clangd.arguments": [
+        "--compile-commands-dir=D:/elvin/Workspace/ESP32/HAPanel/build"
+    ]
 }

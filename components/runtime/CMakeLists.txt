@@ -1,12 +1,8 @@
 idf_component_register(
     SRCS
-        main.c
+        src/hapanel_runtime.c
     INCLUDE_DIRS
-        .
+        include
     REQUIRES
-        esp_psram
-        heap
-        nvs_flash
-        runtime
         services
         ui)

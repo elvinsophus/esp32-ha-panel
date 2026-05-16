@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef enum {
     HAPANEL_SYSTEM_DISPLAY,
@@ -31,6 +32,7 @@ typedef struct {
     hapanel_system_status_item_t items[HAPANEL_SYSTEM_STATUS_COUNT];
     size_t item_count;
     bool psram_ready;
+    uint32_t revision;
 } hapanel_system_status_t;
 
 void hapanel_system_status_init(hapanel_system_status_t *status);

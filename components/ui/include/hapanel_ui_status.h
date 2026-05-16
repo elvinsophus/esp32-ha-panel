@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define HAPANEL_UI_STATUS_MAX_ITEMS 8
+
 typedef enum {
     HAPANEL_UI_STATUS_OK,
     HAPANEL_UI_STATUS_PENDING,

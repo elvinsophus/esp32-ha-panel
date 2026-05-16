@@ -3,6 +3,17 @@
 #include "hapanel_ui_profile.h"
 #include "lvgl.h"
 
+typedef struct {
+    bool created;
+    size_t row_count;
+    lv_obj_t *psram_label;
+    lv_obj_t *wifi_label;
+    lv_obj_t *status_dots[HAPANEL_UI_STATUS_MAX_ITEMS];
+    lv_obj_t *status_values[HAPANEL_UI_STATUS_MAX_ITEMS];
+} hapanel_root_view_t;
+
+static hapanel_root_view_t root_view;
+
 static lv_color_t color_for_status(hapanel_ui_status_level_t level)
 {
     switch (level) {
@@ -60,12 +71,16 @@ static void create_status_bar(lv_obj_t *parent, const hapanel_ui_status_t *statu
     lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(right, HAPANEL_SPACE_SM, 0);
 
-    create_label(right, status->psram_ready ? "PSRAM" : "RAM", &lv_font_montserrat_12,
-                 status->psram_ready ? lv_color_hex(0x8bcfb3) : lv_color_hex(0xf08f5f));
-    create_label(right, "Wi-Fi", &lv_font_montserrat_12, lv_color_hex(0x6f7a86));
+    root_view.psram_label = create_label(right,
+                                         status->psram_ready ? "PSRAM" : "RAM",
+                                         &lv_font_montserrat_12,
+                                         status->psram_ready ? lv_color_hex(0x8bcfb3)
+                                                            : lv_color_hex(0xf08f5f));
+    root_view.wifi_label = create_label(right, "Wi-Fi", &lv_font_montserrat_12,
+                                        lv_color_hex(0x6f7a86));
 }
 
-static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *item)
+static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *item, size_t index)
 {
     lv_obj_t *row = lv_obj_create(parent);
     lv_obj_remove_style_all(row);
@@ -95,7 +110,13 @@ static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *
     lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
 
     create_label(left, item->label, &lv_font_montserrat_16, lv_color_hex(0xb7c1cd));
-    create_label(row, item->value, &lv_font_montserrat_16, lv_color_hex(0xf2f6fa));
+    lv_obj_t *value = create_label(row, item->value, &lv_font_montserrat_16,
+                                   lv_color_hex(0xf2f6fa));
+
+    if (index < HAPANEL_UI_STATUS_MAX_ITEMS) {
+        root_view.status_dots[index] = dot;
+        root_view.status_values[index] = value;
+    }
 }
 
 static lv_obj_t *create_panel(lv_obj_t *parent)
@@ -116,6 +137,8 @@ static lv_obj_t *create_panel(lv_obj_t *parent)
 
 void hapanel_ui_show_root(const hapanel_ui_status_t *status)
 {
+    root_view = (hapanel_root_view_t){0};
+
     lv_obj_t *screen = lv_screen_active();
     lv_obj_clean(screen);
     lv_obj_set_style_bg_color(screen, lv_color_hex(0x0b1017), 0);
@@ -144,12 +167,50 @@ void hapanel_ui_show_root(const hapanel_ui_status_t *status)
     lv_obj_t *panel = create_panel(root);
     create_label(panel, "System Status", &lv_font_montserrat_18, lv_color_hex(0xf2f6fa));
 
-    for (size_t i = 0; i < status->item_count; ++i) {
-        create_status_row(panel, &status->items[i]);
+    const size_t row_count = status->item_count < HAPANEL_UI_STATUS_MAX_ITEMS
+                                 ? status->item_count
+                                 : HAPANEL_UI_STATUS_MAX_ITEMS;
+    root_view.row_count = row_count;
+
+    for (size_t i = 0; i < row_count; ++i) {
+        create_status_row(panel, &status->items[i], i);
     }
 
     lv_obj_t *footer = create_label(root, "Core services will appear here as they come online.",
                                     &lv_font_montserrat_12, lv_color_hex(0x6f7a86));
     lv_label_set_long_mode(footer, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(footer, LV_PCT(100));
+
+    root_view.created = true;
+    hapanel_ui_refresh_root(status);
+}
+
+void hapanel_ui_refresh_root(const hapanel_ui_status_t *status)
+{
+    if (!root_view.created || status == NULL) {
+        return;
+    }
+
+    if (root_view.psram_label != NULL) {
+        lv_label_set_text(root_view.psram_label, status->psram_ready ? "PSRAM" : "RAM");
+        lv_obj_set_style_text_color(root_view.psram_label,
+                                    status->psram_ready ? lv_color_hex(0x8bcfb3)
+                                                       : lv_color_hex(0xf08f5f),
+                                    0);
+    }
+
+    const size_t row_count = status->item_count < root_view.row_count
+                                 ? status->item_count
+                                 : root_view.row_count;
+    for (size_t i = 0; i < row_count; ++i) {
+        if (root_view.status_values[i] != NULL) {
+            lv_label_set_text(root_view.status_values[i], status->items[i].value);
+        }
+
+        if (root_view.status_dots[i] != NULL) {
+            lv_obj_set_style_bg_color(root_view.status_dots[i],
+                                      color_for_status(status->items[i].level),
+                                      0);
+        }
+    }
 }
