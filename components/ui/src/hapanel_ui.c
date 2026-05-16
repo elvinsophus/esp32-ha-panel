@@ -1,6 +1,7 @@
 #include "hapanel_ui.h"
 
 #include "hapanel_profile.h"
+#include "hapanel_ui_fonts.h"
 #include "lvgl.h"
 
 typedef struct {
@@ -70,7 +71,8 @@ static void create_status_bar(lv_obj_t *parent, const hapanel_ui_status_t *statu
     lv_obj_set_flex_align(bar, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
 
-    create_label(bar, "HAPanel", &lv_font_montserrat_16, lv_color_hex(profile->theme.text_primary));
+    create_label(bar, "HAPanel", hapanel_ui_font_static_16(),
+                 lv_color_hex(profile->theme.text_primary));
 
     lv_obj_t *right = lv_obj_create(bar);
     lv_obj_remove_style_all(right);
@@ -82,10 +84,10 @@ static void create_status_bar(lv_obj_t *parent, const hapanel_ui_status_t *statu
 
     root_view.psram_label = create_label(right,
                                          status->psram_ready ? "PSRAM" : "RAM",
-                                         &lv_font_montserrat_12,
+                                         hapanel_ui_font_static_12(),
                                          status->psram_ready ? lv_color_hex(profile->theme.status_ok)
                                                             : lv_color_hex(profile->theme.status_warning));
-    root_view.wifi_label = create_label(right, "Wi-Fi", &lv_font_montserrat_12,
+    root_view.wifi_label = create_label(right, "Wi-Fi", hapanel_ui_font_static_12(),
                                         lv_color_hex(profile->theme.text_muted));
 }
 
@@ -118,8 +120,8 @@ static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *
     lv_obj_set_style_bg_color(dot, color_for_status(item->level), 0);
     lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
 
-    create_label(left, item->label, &lv_font_montserrat_16, lv_color_hex(0xb7c1cd));
-    lv_obj_t *value = create_label(row, item->value, &lv_font_montserrat_16,
+    create_label(left, item->label, hapanel_ui_font_static_16(), lv_color_hex(0xb7c1cd));
+    lv_obj_t *value = create_label(row, item->value, hapanel_ui_font_dynamic_16(),
                                    color_for_status(item->level));
 
     if (index < HAPANEL_UI_STATUS_MAX_ITEMS) {
@@ -176,12 +178,13 @@ void hapanel_ui_show_root(const hapanel_ui_status_t *status)
     lv_obj_set_flex_align(hero, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(hero, 4, 0);
 
-    create_label(hero, "HAPanel", &lv_font_montserrat_26, lv_color_hex(profile->theme.text_primary));
-    create_label(hero, profile->board.name, &lv_font_montserrat_16,
+    create_label(hero, "HAPanel", hapanel_ui_font_static_26(),
+                 lv_color_hex(profile->theme.text_primary));
+    create_label(hero, profile->board.name, hapanel_ui_font_static_16(),
                  lv_color_hex(profile->theme.text_muted));
 
     lv_obj_t *panel = create_panel(root);
-    create_label(panel, "System Status", &lv_font_montserrat_18,
+    create_label(panel, "System Status", hapanel_ui_font_static_18(),
                  lv_color_hex(profile->theme.text_primary));
 
     const size_t row_count = status->item_count < HAPANEL_UI_STATUS_MAX_ITEMS
@@ -194,7 +197,7 @@ void hapanel_ui_show_root(const hapanel_ui_status_t *status)
     }
 
     lv_obj_t *footer = create_label(root, "Core services will appear here as they come online.",
-                                    &lv_font_montserrat_12,
+                                    hapanel_ui_font_static_12(),
                                     lv_color_hex(profile->theme.text_muted));
     lv_label_set_long_mode(footer, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(footer, LV_PCT(100));

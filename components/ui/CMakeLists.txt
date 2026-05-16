@@ -1,6 +1,8 @@
 idf_component_register(
     SRCS
         src/hapanel_ui.c
+        src/hapanel_ui_fonts.c
+        fonts/hapanel_font_dynamic_16.c
     INCLUDE_DIRS
         include
     REQUIRES
