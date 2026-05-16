@@ -8,6 +8,7 @@ idf_component_register(
         heap
         network
         nvs_flash
+        ota
         profile
         runtime
         services

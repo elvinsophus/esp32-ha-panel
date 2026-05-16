@@ -7,6 +7,7 @@
 #include "nvs_flash.h"
 
 #include "hapanel_network.h"
+#include "hapanel_ota.h"
 #include "hapanel_profile.h"
 #include "hapanel_runtime.h"
 
@@ -74,11 +75,14 @@ void app_main(void)
                                HAPANEL_SYSTEM_LEVEL_OK);
     hapanel_runtime_set_status(&runtime, HAPANEL_SYSTEM_TOUCH, "BSP online",
                                HAPANEL_SYSTEM_LEVEL_OK);
+    esp_err_t ota_result = hapanel_ota_init(&runtime);
+    if (ota_result != ESP_OK) {
+        ESP_LOGW(TAG, "OTA foundation init returned: %s", esp_err_to_name(ota_result));
+    }
 
     bsp_display_lock(0);
     hapanel_runtime_render_root(&runtime);
 
-    hapanel_runtime_set_status(&runtime, HAPANEL_SYSTEM_OTA, "Idle", HAPANEL_SYSTEM_LEVEL_OK);
     hapanel_runtime_refresh_root(&runtime);
     bsp_display_unlock();
 
