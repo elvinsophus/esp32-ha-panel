@@ -1,0 +1,4 @@
+board: waveshare_esp32s3_touch_lcd_4b
+layout: square_480
+performance: esp32s3_psram
+theme: default_dark

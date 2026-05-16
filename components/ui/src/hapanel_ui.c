@@ -1,6 +1,6 @@
 #include "hapanel_ui.h"
 
-#include "hapanel_ui_profile.h"
+#include "hapanel_profile.h"
 #include "lvgl.h"
 
 typedef struct {
@@ -14,20 +14,27 @@ typedef struct {
 
 static hapanel_root_view_t root_view;
 
+static const hapanel_profile_t *ui_profile(void)
+{
+    return hapanel_profile_active();
+}
+
 static lv_color_t color_for_status(hapanel_ui_status_level_t level)
 {
+    const hapanel_theme_profile_t *theme = &ui_profile()->theme;
+
     switch (level) {
     case HAPANEL_UI_STATUS_OK:
-        return lv_color_hex(0x5dd39e);
+        return lv_color_hex(theme->status_ok);
     case HAPANEL_UI_STATUS_PENDING:
-        return lv_color_hex(0xe6b85c);
+        return lv_color_hex(theme->status_pending);
     case HAPANEL_UI_STATUS_WARNING:
-        return lv_color_hex(0xf08f5f);
+        return lv_color_hex(theme->status_warning);
     case HAPANEL_UI_STATUS_ERROR:
-        return lv_color_hex(0xff6b6b);
+        return lv_color_hex(theme->status_error);
     case HAPANEL_UI_STATUS_OFFLINE:
     default:
-        return lv_color_hex(0x8f9aa8);
+        return lv_color_hex(theme->status_offline);
     }
 }
 
@@ -52,16 +59,18 @@ static void configure_column(lv_obj_t *obj, int32_t row_gap)
 
 static void create_status_bar(lv_obj_t *parent, const hapanel_ui_status_t *status)
 {
+    const hapanel_profile_t *profile = ui_profile();
+
     lv_obj_t *bar = lv_obj_create(parent);
     lv_obj_remove_style_all(bar);
     lv_obj_set_width(bar, LV_PCT(100));
-    lv_obj_set_height(bar, HAPANEL_STATUS_BAR_HEIGHT);
+    lv_obj_set_height(bar, profile->layout.status_bar_height);
     lv_obj_set_layout(bar, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(bar, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(bar, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
 
-    create_label(bar, "HAPanel", &lv_font_montserrat_16, lv_color_hex(0xe8edf3));
+    create_label(bar, "HAPanel", &lv_font_montserrat_16, lv_color_hex(profile->theme.text_primary));
 
     lv_obj_t *right = lv_obj_create(bar);
     lv_obj_remove_style_all(right);
@@ -69,15 +78,15 @@ static void create_status_bar(lv_obj_t *parent, const hapanel_ui_status_t *statu
     lv_obj_set_layout(right, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(right, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(right, HAPANEL_SPACE_SM, 0);
+    lv_obj_set_style_pad_column(right, profile->spacing.sm, 0);
 
     root_view.psram_label = create_label(right,
                                          status->psram_ready ? "PSRAM" : "RAM",
                                          &lv_font_montserrat_12,
-                                         status->psram_ready ? lv_color_hex(0x8bcfb3)
-                                                            : lv_color_hex(0xf08f5f));
+                                         status->psram_ready ? lv_color_hex(profile->theme.status_ok)
+                                                            : lv_color_hex(profile->theme.status_warning));
     root_view.wifi_label = create_label(right, "Wi-Fi", &lv_font_montserrat_12,
-                                        lv_color_hex(0x6f7a86));
+                                        lv_color_hex(profile->theme.text_muted));
 }
 
 static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *item, size_t index)
@@ -121,34 +130,38 @@ static void create_status_row(lv_obj_t *parent, const hapanel_ui_status_item_t *
 
 static lv_obj_t *create_panel(lv_obj_t *parent)
 {
+    const hapanel_profile_t *profile = ui_profile();
+
     lv_obj_t *panel = lv_obj_create(parent);
     lv_obj_remove_style_all(panel);
     lv_obj_set_width(panel, LV_PCT(100));
     lv_obj_set_height(panel, LV_SIZE_CONTENT);
-    lv_obj_set_style_pad_all(panel, HAPANEL_SPACE_MD, 0);
-    lv_obj_set_style_radius(panel, HAPANEL_RADIUS_SM, 0);
-    lv_obj_set_style_bg_color(panel, lv_color_hex(0x151b24), 0);
+    lv_obj_set_style_pad_all(panel, profile->spacing.md, 0);
+    lv_obj_set_style_radius(panel, profile->radius.sm, 0);
+    lv_obj_set_style_bg_color(panel, lv_color_hex(profile->theme.surface), 0);
     lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(panel, 1, 0);
-    lv_obj_set_style_border_color(panel, lv_color_hex(0x253141), 0);
-    configure_column(panel, HAPANEL_SPACE_XS);
+    lv_obj_set_style_border_color(panel, lv_color_hex(profile->theme.surface_border), 0);
+    configure_column(panel, profile->spacing.xs);
     return panel;
 }
 
 void hapanel_ui_show_root(const hapanel_ui_status_t *status)
 {
+    const hapanel_profile_t *profile = ui_profile();
+
     root_view = (hapanel_root_view_t){0};
 
     lv_obj_t *screen = lv_screen_active();
     lv_obj_clean(screen);
-    lv_obj_set_style_bg_color(screen, lv_color_hex(0x0b1017), 0);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(profile->theme.background), 0);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
 
     lv_obj_t *root = lv_obj_create(screen);
     lv_obj_remove_style_all(root);
     lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_pad_all(root, HAPANEL_SPACE_MD, 0);
-    configure_column(root, HAPANEL_SPACE_MD);
+    lv_obj_set_style_pad_all(root, profile->spacing.md, 0);
+    configure_column(root, profile->spacing.md);
 
     create_status_bar(root, status);
 
@@ -161,11 +174,13 @@ void hapanel_ui_show_root(const hapanel_ui_status_t *status)
     lv_obj_set_flex_align(hero, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(hero, 10, 0);
 
-    create_label(hero, "HAPanel", &lv_font_montserrat_26, lv_color_hex(0xf4f7fb));
-    create_label(hero, "Foundation firmware", &lv_font_montserrat_16, lv_color_hex(0x7f8b99));
+    create_label(hero, "HAPanel", &lv_font_montserrat_26, lv_color_hex(profile->theme.text_primary));
+    create_label(hero, profile->board.name, &lv_font_montserrat_16,
+                 lv_color_hex(profile->theme.text_muted));
 
     lv_obj_t *panel = create_panel(root);
-    create_label(panel, "System Status", &lv_font_montserrat_18, lv_color_hex(0xf2f6fa));
+    create_label(panel, "System Status", &lv_font_montserrat_18,
+                 lv_color_hex(profile->theme.text_primary));
 
     const size_t row_count = status->item_count < HAPANEL_UI_STATUS_MAX_ITEMS
                                  ? status->item_count
@@ -177,7 +192,8 @@ void hapanel_ui_show_root(const hapanel_ui_status_t *status)
     }
 
     lv_obj_t *footer = create_label(root, "Core services will appear here as they come online.",
-                                    &lv_font_montserrat_12, lv_color_hex(0x6f7a86));
+                                    &lv_font_montserrat_12,
+                                    lv_color_hex(profile->theme.text_muted));
     lv_label_set_long_mode(footer, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(footer, LV_PCT(100));
 
@@ -192,10 +208,11 @@ void hapanel_ui_refresh_root(const hapanel_ui_status_t *status)
     }
 
     if (root_view.psram_label != NULL) {
+        const hapanel_profile_t *profile = ui_profile();
         lv_label_set_text(root_view.psram_label, status->psram_ready ? "PSRAM" : "RAM");
         lv_obj_set_style_text_color(root_view.psram_label,
-                                    status->psram_ready ? lv_color_hex(0x8bcfb3)
-                                                       : lv_color_hex(0xf08f5f),
+                                    status->psram_ready ? lv_color_hex(profile->theme.status_ok)
+                                                       : lv_color_hex(profile->theme.status_warning),
                                     0);
     }
 
