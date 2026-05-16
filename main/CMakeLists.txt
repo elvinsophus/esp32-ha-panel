@@ -7,4 +7,5 @@ idf_component_register(
         esp_psram
         heap
         nvs_flash
+        services
         ui)
