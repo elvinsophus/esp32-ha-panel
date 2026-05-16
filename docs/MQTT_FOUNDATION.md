@@ -9,12 +9,13 @@ Current behavior:
 - remains functional when MQTT is not configured
 - starts ESP-MQTT when a broker URI is configured
 - reports connecting, connected, disconnected, and error states
+- waits for Wi-Fi/IP before starting the MQTT client
+- publishes retained `online` availability on connect
+- configures a retained `offline` last-will message
 
 Current limitation:
-- MQTT starts after the network service starts, but it does not yet wait for a
-  confirmed Wi-Fi/IP-online event
 - no Home Assistant discovery, entity state, command, or availability topics
-  are implemented yet
+  beyond basic availability are implemented yet
 
-The next MQTT step is to connect only after Wi-Fi is online, then publish a
-minimal availability/status message.
+The next MQTT step is to publish a minimal structured device status topic, then
+add Home Assistant discovery only after the topic model is stable.

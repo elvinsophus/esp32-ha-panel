@@ -4,5 +4,7 @@ idf_component_register(
     INCLUDE_DIRS
         include
     REQUIRES
+        esp_event
+        esp_wifi
         mqtt
         runtime)

@@ -28,4 +28,12 @@ menu "HAPanel MQTT"
             Optional MQTT password. Avoid committing local credentials into
             sdkconfig defaults.
 
+    config HAPANEL_MQTT_AVAILABILITY_TOPIC
+        string "MQTT availability topic"
+        default "hapanel/status"
+        help
+            Retained availability topic used for early Home Assistant bring-up.
+            The panel publishes "online" when connected and configures a last
+            will of "offline".
+
 endmenu
