@@ -6,9 +6,20 @@
 #include "esp_psram.h"
 #include "nvs_flash.h"
 
+#include "hapanel_network.h"
 #include "hapanel_runtime.h"
 
 static const char *TAG = "hapanel";
+
+static void refresh_root_ui(void *context)
+{
+    hapanel_runtime_t *runtime = (hapanel_runtime_t *)context;
+
+    if (bsp_display_lock(0)) {
+        hapanel_runtime_refresh_root(runtime);
+        bsp_display_unlock();
+    }
+}
 
 void app_main(void)
 {
@@ -50,4 +61,11 @@ void app_main(void)
     hapanel_runtime_set_status(&runtime, HAPANEL_SYSTEM_OTA, "Idle", HAPANEL_SYSTEM_LEVEL_OK);
     hapanel_runtime_refresh_root(&runtime);
     bsp_display_unlock();
+
+    hapanel_runtime_set_refresh_callback(&runtime, refresh_root_ui, &runtime);
+
+    esp_err_t network_result = hapanel_network_start(&runtime);
+    if (network_result != ESP_OK) {
+        ESP_LOGW(TAG, "Network start returned: %s", esp_err_to_name(network_result));
+    }
 }

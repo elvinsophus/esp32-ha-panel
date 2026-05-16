@@ -52,6 +52,9 @@ void hapanel_runtime_set_psram_ready(hapanel_runtime_t *runtime, bool ready)
     }
 
     hapanel_system_status_set_psram_ready(&runtime->system_status, ready);
+    if (runtime->refresh_callback != NULL) {
+        runtime->refresh_callback(runtime->refresh_context);
+    }
 }
 
 void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
@@ -64,6 +67,21 @@ void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
     }
 
     hapanel_system_status_set(&runtime->system_status, subsystem, value, level);
+    if (runtime->refresh_callback != NULL) {
+        runtime->refresh_callback(runtime->refresh_context);
+    }
+}
+
+void hapanel_runtime_set_refresh_callback(hapanel_runtime_t *runtime,
+                                          void (*callback)(void *context),
+                                          void *context)
+{
+    if (runtime == NULL) {
+        return;
+    }
+
+    runtime->refresh_callback = callback;
+    runtime->refresh_context = context;
 }
 
 void hapanel_runtime_render_root(hapanel_runtime_t *runtime)

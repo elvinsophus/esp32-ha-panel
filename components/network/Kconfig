@@ -1,0 +1,17 @@
+menu "HAPanel Network"
+
+    config HAPANEL_WIFI_SSID
+        string "Wi-Fi SSID"
+        default ""
+        help
+            Optional Wi-Fi SSID for early bring-up. Leave empty to keep Wi-Fi
+            initialized but disconnected until runtime provisioning exists.
+
+    config HAPANEL_WIFI_PASSWORD
+        string "Wi-Fi password"
+        default ""
+        help
+            Optional Wi-Fi password for early bring-up. Avoid committing local
+            credentials into sdkconfig defaults.
+
+endmenu
