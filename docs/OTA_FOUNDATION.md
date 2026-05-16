@@ -11,14 +11,16 @@ Current behavior:
   initialization succeed
 - runs an OTA preflight check that selects the next update slot and blocks
   updates while the running image still needs validation
+- exposes a transport-agnostic OTA install session API for begin, write,
+  finish, and abort
 
 Current limitation:
-- update download and installation are not implemented yet
+- update download and transport triggers are not implemented yet
 
 Safety boundary:
 - no image download is implemented yet
-- no flash write is implemented yet
-- no boot partition switch is implemented yet
+- no flash write happens during normal boot
+- no boot partition switch happens during normal boot
 - no partition layout change is made by the service itself
 
 Before enabling real OTA updates, the partition and recovery strategy must be
@@ -78,3 +80,20 @@ update triggers must pass before starting an OTA write. It reports:
 - the target OTA slot, address, and size
 
 The preflight does not erase, write, download, or switch boot partitions.
+
+## Install Session
+
+`hapanel_ota_begin()`, `hapanel_ota_write()`, `hapanel_ota_finish()`, and
+`hapanel_ota_abort()` provide the transport-independent install engine.
+
+The session API:
+- requires a known non-zero image size
+- rejects images larger than the selected OTA slot
+- runs preflight before erasing the target slot
+- writes only to the selected inactive OTA partition
+- validates the image with `esp_ota_end()`
+- switches the next boot partition only after validation succeeds
+- reports `Reboot needed` instead of restarting automatically
+
+No current boot path calls this session API. A future MQTT, HTTP, or local
+update trigger must call it explicitly.

@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "esp_log.h"
 #include "esp_ota_ops.h"
@@ -136,6 +137,153 @@ esp_err_t hapanel_ota_preflight(hapanel_ota_preflight_t *preflight)
     set_preflight_result(preflight, true, "ready", running, target);
     log_preflight(preflight);
     return ESP_OK;
+}
+
+esp_err_t hapanel_ota_begin(hapanel_runtime_t *runtime,
+                            hapanel_ota_session_t *session,
+                            size_t image_size)
+{
+    if (session == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (session->active) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (image_size == 0) {
+        set_ota_status(runtime, "Invalid image", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    hapanel_ota_preflight_t preflight;
+    esp_err_t preflight_result = hapanel_ota_preflight(&preflight);
+    if (preflight_result != ESP_OK || !preflight.allowed) {
+        set_ota_status(runtime, "Preflight blocked", HAPANEL_SYSTEM_LEVEL_WARNING);
+        return preflight_result != ESP_OK ? preflight_result : ESP_FAIL;
+    }
+
+    if (image_size > preflight.target_size) {
+        ESP_LOGE(TAG,
+                 "OTA image is too large: image=%zu target=%" PRIu32,
+                 image_size,
+                 preflight.target_size);
+        set_ota_status(runtime, "Image too large", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    const esp_partition_t *target = esp_ota_get_next_update_partition(NULL);
+    if (target == NULL) {
+        set_ota_status(runtime, "No update slot", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    esp_ota_handle_t handle = 0;
+    set_ota_status(runtime, "Preparing", HAPANEL_SYSTEM_LEVEL_PENDING);
+    esp_err_t begin_result = esp_ota_begin(target, image_size, &handle);
+    if (begin_result != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to begin OTA write: %s", esp_err_to_name(begin_result));
+        set_ota_status(runtime, "Begin failed", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return begin_result;
+    }
+
+    *session = (hapanel_ota_session_t){
+        .active = true,
+        .handle = handle,
+        .target = target,
+        .runtime = runtime,
+        .expected_size = image_size,
+        .written_size = 0,
+    };
+
+    ESP_LOGI(TAG,
+             "OTA write session started: target=%s size=%zu",
+             target->label,
+             image_size);
+    set_ota_status(runtime, "Receiving", HAPANEL_SYSTEM_LEVEL_PENDING);
+    return ESP_OK;
+}
+
+esp_err_t hapanel_ota_write(hapanel_ota_session_t *session, const void *data, size_t size)
+{
+    if (session == NULL || !session->active || data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (size == 0) {
+        return ESP_OK;
+    }
+
+    if (session->written_size > session->expected_size ||
+        size > session->expected_size - session->written_size) {
+        set_ota_status(session->runtime, "Image too large", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    esp_err_t write_result = esp_ota_write(session->handle, data, size);
+    if (write_result != ESP_OK) {
+        ESP_LOGE(TAG, "OTA write failed after %zu bytes: %s",
+                 session->written_size,
+                 esp_err_to_name(write_result));
+        set_ota_status(session->runtime, "Write failed", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return write_result;
+    }
+
+    session->written_size += size;
+    return ESP_OK;
+}
+
+esp_err_t hapanel_ota_finish(hapanel_ota_session_t *session)
+{
+    if (session == NULL || !session->active) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (session->written_size != session->expected_size) {
+        ESP_LOGE(TAG,
+                 "OTA image is incomplete: written=%zu expected=%zu",
+                 session->written_size,
+                 session->expected_size);
+        set_ota_status(session->runtime, "Incomplete", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    esp_err_t end_result = esp_ota_end(session->handle);
+    if (end_result != ESP_OK) {
+        ESP_LOGE(TAG, "OTA image validation failed: %s", esp_err_to_name(end_result));
+        set_ota_status(session->runtime, "Invalid image", HAPANEL_SYSTEM_LEVEL_ERROR);
+        memset(session, 0, sizeof(*session));
+        return end_result;
+    }
+
+    esp_err_t boot_result = esp_ota_set_boot_partition(session->target);
+    if (boot_result != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set OTA boot partition: %s", esp_err_to_name(boot_result));
+        set_ota_status(session->runtime, "Boot set failed", HAPANEL_SYSTEM_LEVEL_ERROR);
+        memset(session, 0, sizeof(*session));
+        return boot_result;
+    }
+
+    ESP_LOGI(TAG, "OTA image staged for next boot: target=%s", session->target->label);
+    set_ota_status(session->runtime, "Reboot needed", HAPANEL_SYSTEM_LEVEL_OK);
+    memset(session, 0, sizeof(*session));
+    return ESP_OK;
+}
+
+esp_err_t hapanel_ota_abort(hapanel_ota_session_t *session)
+{
+    if (session == NULL || !session->active) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t abort_result = esp_ota_abort(session->handle);
+    if (abort_result != ESP_OK) {
+        ESP_LOGW(TAG, "OTA abort returned: %s", esp_err_to_name(abort_result));
+    }
+
+    set_ota_status(session->runtime, "Aborted", HAPANEL_SYSTEM_LEVEL_WARNING);
+    memset(session, 0, sizeof(*session));
+    return abort_result;
 }
 
 esp_err_t hapanel_ota_init(hapanel_runtime_t *runtime)
