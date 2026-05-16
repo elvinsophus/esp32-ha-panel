@@ -2,11 +2,14 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
+#include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
+#include "hapanel_profile.h"
 #include "mqtt_client.h"
 
 static const char *TAG = "hapanel_mqtt";
@@ -15,6 +18,141 @@ static hapanel_runtime_t *mqtt_runtime;
 static esp_mqtt_client_handle_t mqtt_client;
 static bool event_handlers_registered;
 static bool mqtt_started;
+
+static void json_escape(const char *input, char *output, size_t output_size)
+{
+    if (output_size == 0) {
+        return;
+    }
+
+    if (input == NULL) {
+        input = "";
+    }
+
+    size_t out = 0;
+    for (size_t in = 0; input[in] != '\0' && out + 1 < output_size; ++in) {
+        const unsigned char ch = (unsigned char)input[in];
+        const char *replacement = NULL;
+
+        switch (ch) {
+        case '"':
+            replacement = "\\\"";
+            break;
+        case '\\':
+            replacement = "\\\\";
+            break;
+        case '\b':
+            replacement = "\\b";
+            break;
+        case '\f':
+            replacement = "\\f";
+            break;
+        case '\n':
+            replacement = "\\n";
+            break;
+        case '\r':
+            replacement = "\\r";
+            break;
+        case '\t':
+            replacement = "\\t";
+            break;
+        default:
+            break;
+        }
+
+        if (replacement != NULL) {
+            const size_t replacement_len = strlen(replacement);
+            if (out + replacement_len >= output_size) {
+                break;
+            }
+            memcpy(&output[out], replacement, replacement_len);
+            out += replacement_len;
+        } else if (ch < 0x20) {
+            if (out + 6 >= output_size) {
+                break;
+            }
+            snprintf(&output[out], output_size - out, "\\u%04x", ch);
+            out += 6;
+        } else {
+            output[out++] = (char)ch;
+        }
+    }
+
+    output[out] = '\0';
+}
+
+static void publish_device_status(esp_mqtt_client_handle_t client)
+{
+    const hapanel_profile_t *profile = hapanel_profile_active();
+    const esp_app_desc_t *app = esp_app_get_description();
+
+    char client_id[96];
+    char app_version[48];
+    char board_id[96];
+    char board_name[96];
+    char layout_id[48];
+    char mcu[48];
+    char display[96];
+    char touch[48];
+    char availability_topic[128];
+
+    json_escape(CONFIG_HAPANEL_MQTT_CLIENT_ID, client_id, sizeof(client_id));
+    json_escape(app->version, app_version, sizeof(app_version));
+    json_escape(profile->board.id, board_id, sizeof(board_id));
+    json_escape(profile->board.name, board_name, sizeof(board_name));
+    json_escape(profile->layout.id, layout_id, sizeof(layout_id));
+    json_escape(profile->board.mcu, mcu, sizeof(mcu));
+    json_escape(profile->board.display, display, sizeof(display));
+    json_escape(profile->board.touch, touch, sizeof(touch));
+    json_escape(CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC,
+                availability_topic,
+                sizeof(availability_topic));
+
+    char payload[768];
+    const int payload_len = snprintf(
+        payload,
+        sizeof(payload),
+        "{\"schema\":\"hapanel.device_status.v1\","
+        "\"client_id\":\"%s\","
+        "\"app_version\":\"%s\","
+        "\"board\":{\"id\":\"%s\",\"name\":\"%s\",\"mcu\":\"%s\",\"flash_mb\":%u,"
+        "\"psram_mb\":%u,\"display\":\"%s\",\"touch\":\"%s\"},"
+        "\"layout\":{\"id\":\"%s\",\"width\":%u,\"height\":%u},"
+        "\"mqtt\":{\"availability_topic\":\"%s\"}}",
+        client_id,
+        app_version,
+        board_id,
+        board_name,
+        mcu,
+        profile->board.flash_mb,
+        profile->board.psram_mb,
+        display,
+        touch,
+        layout_id,
+        profile->layout.width,
+        profile->layout.height,
+        availability_topic);
+
+    if (payload_len < 0 || payload_len >= (int)sizeof(payload)) {
+        ESP_LOGW(TAG, "MQTT device status payload truncated; skipping publish");
+        return;
+    }
+
+    const int msg_id = esp_mqtt_client_publish(client,
+                                               CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC,
+                                               payload,
+                                               payload_len,
+                                               0,
+                                               1);
+    if (msg_id < 0) {
+        ESP_LOGW(TAG, "Failed to publish MQTT device status");
+    } else {
+        ESP_LOGI(TAG,
+                 "Published MQTT device status: topic=%s msg_id=%d",
+                 CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC,
+                 msg_id);
+    }
+}
 
 static void set_mqtt_status(const char *value, hapanel_system_level_t level)
 {
@@ -90,6 +228,7 @@ static void mqtt_event_handler(void *handler_args,
                                 0,
                                 0,
                                 1);
+        publish_device_status(event->client);
         set_mqtt_status(CONFIG_HAPANEL_MQTT_BROKER_URI, HAPANEL_SYSTEM_LEVEL_OK);
         break;
     case MQTT_EVENT_DISCONNECTED:

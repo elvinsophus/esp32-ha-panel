@@ -14,13 +14,16 @@ Current behavior:
 - waits for Wi-Fi/IP before starting the MQTT client
 - publishes retained `online` availability on connect
 - configures a retained `offline` last-will message
+- publishes retained structured device status JSON to
+  `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`
 
 Current limitation:
 - no Home Assistant discovery, entity state, command, or availability topics
   beyond basic availability are implemented yet
 
-The next MQTT step is to publish a minimal structured device status topic, then
-add Home Assistant discovery only after the topic model is stable.
+The next MQTT step is to subscribe to a small command/control topic for
+foundation-level panel actions. Add Home Assistant discovery only after the topic
+model is stable.
 
 ## Local Bring-Up
 

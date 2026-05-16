@@ -36,4 +36,11 @@ menu "HAPanel MQTT"
             The panel publishes "online" when connected and configures a last
             will of "offline".
 
+    config HAPANEL_MQTT_DEVICE_STATUS_TOPIC
+        string "MQTT device status topic"
+        default "hapanel/device/status"
+        help
+            Retained JSON topic with a minimal structured device status payload.
+            This is the stable foundation for future Home Assistant discovery.
+
 endmenu
