@@ -19,13 +19,31 @@ static void set_wifi_status(const char *value, hapanel_system_level_t level)
     hapanel_runtime_set_status(network_runtime, HAPANEL_SYSTEM_WIFI, value, level);
 }
 
+static const char *disconnect_reason_name(uint8_t reason)
+{
+    switch (reason) {
+    case WIFI_REASON_NO_AP_FOUND:
+        return "NO_AP_FOUND";
+    case WIFI_REASON_AUTH_FAIL:
+        return "AUTH_FAIL";
+    case WIFI_REASON_ASSOC_FAIL:
+        return "ASSOC_FAIL";
+    case WIFI_REASON_HANDSHAKE_TIMEOUT:
+        return "HANDSHAKE_TIMEOUT";
+    case WIFI_REASON_CONNECTION_FAIL:
+        return "CONNECTION_FAIL";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id,
                                void *event_data)
 {
     (void)arg;
-    (void)event_data;
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        ESP_LOGI(TAG, "Wi-Fi station started; connecting");
         set_wifi_status("Connecting", HAPANEL_SYSTEM_LEVEL_PENDING);
         esp_err_t err = esp_wifi_connect();
         if (err != ESP_OK) {
@@ -33,8 +51,18 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             set_wifi_status("Connect failed", HAPANEL_SYSTEM_LEVEL_WARNING);
         }
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        const wifi_event_sta_disconnected_t *disconnected =
+            (const wifi_event_sta_disconnected_t *)event_data;
+        ESP_LOGW(TAG, "Wi-Fi disconnected: reason=%d (%s)", disconnected->reason,
+                 disconnect_reason_name(disconnected->reason));
         set_wifi_status("Disconnected", HAPANEL_SYSTEM_LEVEL_OFFLINE);
+        esp_err_t err = esp_wifi_connect();
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Wi-Fi reconnect failed: %s", esp_err_to_name(err));
+            set_wifi_status("Reconnect failed", HAPANEL_SYSTEM_LEVEL_WARNING);
+        }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ESP_LOGI(TAG, "Wi-Fi obtained an IP address");
         set_wifi_status("Connected", HAPANEL_SYSTEM_LEVEL_OK);
     }
 }
