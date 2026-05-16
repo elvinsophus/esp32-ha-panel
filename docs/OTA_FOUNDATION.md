@@ -13,6 +13,8 @@ Current behavior:
   updates while the running image still needs validation
 - exposes a transport-agnostic OTA install session API for begin, write,
   finish, and abort
+- exposes an opt-in local OTA self-test staging path that copies the running
+  image into the next OTA slot through the install session API
 
 Current limitation:
 - update download and transport triggers are not implemented yet
@@ -97,3 +99,14 @@ The session API:
 
 No current boot path calls this session API. A future MQTT, HTTP, or local
 update trigger must call it explicitly.
+
+## Local Self-Test Staging
+
+`hapanel_ota_self_test_stage_running()` copies the currently running app image
+into the next OTA slot using the same begin/write/finish API that future
+transports will use. It is intended for controlled bring-up tests of slot
+selection, `otadata`, reboot, pending verification, and rollback validation.
+
+The self-test API is not called during normal boot. When it is eventually
+triggered, it stages the copied image and reports `Reboot needed`; it does not
+restart the panel automatically.

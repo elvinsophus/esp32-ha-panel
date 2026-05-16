@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "esp_log.h"
@@ -11,6 +12,10 @@
 #include "sdkconfig.h"
 
 static const char *TAG = "hapanel_ota";
+
+enum {
+    HAPANEL_OTA_COPY_CHUNK_SIZE = 4096,
+};
 
 static void log_partition(const char *role, const esp_partition_t *partition)
 {
@@ -284,6 +289,72 @@ esp_err_t hapanel_ota_abort(hapanel_ota_session_t *session)
     set_ota_status(session->runtime, "Aborted", HAPANEL_SYSTEM_LEVEL_WARNING);
     memset(session, 0, sizeof(*session));
     return abort_result;
+}
+
+esp_err_t hapanel_ota_self_test_stage_running(hapanel_runtime_t *runtime)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    if (running == NULL) {
+        set_ota_status(runtime, "Partition error", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    hapanel_ota_session_t session = {0};
+    esp_err_t begin_result = hapanel_ota_begin(runtime, &session, running->size);
+    if (begin_result != ESP_OK) {
+        ESP_LOGW(TAG, "Self-test OTA begin failed: %s", esp_err_to_name(begin_result));
+        return begin_result;
+    }
+
+    uint8_t *buffer = malloc(HAPANEL_OTA_COPY_CHUNK_SIZE);
+    if (buffer == NULL) {
+        hapanel_ota_abort(&session);
+        set_ota_status(runtime, "No memory", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_ERR_NO_MEM;
+    }
+
+    ESP_LOGW(TAG,
+             "Starting local OTA self-test copy: source=%s target=%s size=%" PRIu32,
+             running->label,
+             session.target->label,
+             running->size);
+
+    for (uint32_t offset = 0; offset < running->size; offset += HAPANEL_OTA_COPY_CHUNK_SIZE) {
+        const uint32_t remaining = running->size - offset;
+        const size_t chunk_size = remaining < HAPANEL_OTA_COPY_CHUNK_SIZE
+                                      ? remaining
+                                      : HAPANEL_OTA_COPY_CHUNK_SIZE;
+
+        esp_err_t read_result = esp_partition_read(running, offset, buffer, chunk_size);
+        if (read_result != ESP_OK) {
+            ESP_LOGE(TAG,
+                     "Self-test OTA read failed at offset=%" PRIu32 ": %s",
+                     offset,
+                     esp_err_to_name(read_result));
+            free(buffer);
+            hapanel_ota_abort(&session);
+            set_ota_status(runtime, "Read failed", HAPANEL_SYSTEM_LEVEL_ERROR);
+            return read_result;
+        }
+
+        esp_err_t write_result = hapanel_ota_write(&session, buffer, chunk_size);
+        if (write_result != ESP_OK) {
+            free(buffer);
+            hapanel_ota_abort(&session);
+            return write_result;
+        }
+    }
+
+    free(buffer);
+
+    esp_err_t finish_result = hapanel_ota_finish(&session);
+    if (finish_result != ESP_OK) {
+        ESP_LOGE(TAG, "Self-test OTA finish failed: %s", esp_err_to_name(finish_result));
+        return finish_result;
+    }
+
+    ESP_LOGW(TAG, "Local OTA self-test image staged; reboot is required to exercise rollback");
+    return ESP_OK;
 }
 
 esp_err_t hapanel_ota_init(hapanel_runtime_t *runtime)
