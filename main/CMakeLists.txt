@@ -1,14 +1,10 @@
 idf_component_register(
     SRCS
         main.c
-        ui/hapanel_boot_ui.c
     INCLUDE_DIRS
         .
+    REQUIRES
+        esp_psram
+        heap
+        nvs_flash
         ui)
-
-idf_component_get_property(LVGL_LIB lvgl__lvgl COMPONENT_LIB)
-target_compile_options(
-    ${LVGL_LIB} 
-    PRIVATE
-        -DLV_LVGL_H_INCLUDE_SIMPLE
-)

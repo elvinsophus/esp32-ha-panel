@@ -18,9 +18,7 @@ This IS:
 - intended for long-term Home Assistant integration
 - designed as a modular panel OS
 
----
-
-# Hardware
+## Hardware
 
 Board:
 - Waveshare ESP32-S3-Touch-LCD-4B
@@ -49,12 +47,9 @@ Connectivity:
 - MQTT
 - OTA firmware updates
 
----
-
-# Architecture Philosophy
+## Architecture Philosophy
 
 The project must prioritize:
-
 - modularity
 - maintainability
 - responsiveness
@@ -68,25 +63,9 @@ Avoid:
 - deeply coupled modules
 - spaghetti state management
 
-Preferred architecture:
-
-components/
-    ui/
-    mqtt/
-    ha/
-    services/
-    drivers/
-    storage/
-    network/
-
-Each major subsystem should be isolated.
-
----
-
-# UI Philosophy
+## UI Philosophy
 
 Target visual style:
-
 - minimalist
 - elegant
 - premium
@@ -97,22 +76,9 @@ Target visual style:
 - no gamer aesthetics
 - no clutter
 
-The panel should resemble:
-- premium smart-home panels
-- modern automotive HMIs
-- refined industrial interfaces
-
-Avoid:
-- rainbow RGB aesthetics
-- childish widgets
-- overly dense dashboards
-
----
-
-# Current Milestone
+## Current Milestone
 
 Current development phase:
-
 1. Boot successfully
 2. Initialize LCD
 3. Initialize touch
@@ -122,18 +88,7 @@ Current development phase:
 7. Implement OTA
 8. Build foundational architecture
 
-DO NOT prematurely implement:
-- advanced dashboards
-- complex HA automation logic
-- voice assistant systems
-- camera streaming
-- AI features
-
-Foundation first.
-
----
-
-# Home Assistant Integration
+## Home Assistant Integration
 
 Preferred integration:
 1. MQTT first
@@ -142,16 +97,11 @@ Preferred integration:
 The firmware should remain functional even if:
 - HA is offline
 - MQTT is unavailable
-- Wi-Fi disconnects temporarily
+- Wi‑Fi disconnects temporarily
 
-Graceful degradation is important.
-
----
-
-# Embedded Constraints
+## Embedded Constraints
 
 Important constraints:
-
 - RAM is limited
 - Avoid heap fragmentation
 - Use PSRAM carefully
@@ -159,14 +109,7 @@ Important constraints:
 - Prefer async/event-driven design
 - UI must remain responsive
 
-Avoid:
-- unnecessary dynamic allocation
-- large temporary buffers
-- blocking delays in UI tasks
-
----
-
-# OTA and Recovery
+## OTA and Recovery
 
 OTA support is required.
 
@@ -178,41 +121,3 @@ Agents must NOT:
 - change partition layouts recklessly
 
 without explicit approval.
-
----
-
-# Allowed Agent Actions
-
-Agents MAY:
-- edit source files
-- refactor modules
-- reorganize architecture
-- modify CMake files
-- add components
-- run builds/tests
-
-Agents MUST NOT:
-- flash firmware automatically
-- erase flash
-- overwrite factory backups
-- modify security-sensitive credentials
-
-without explicit user confirmation.
-
----
-
-# Long-Term Vision
-
-Future planned capabilities:
-
-- Home Assistant control
-- plant monitoring integration
-- Frigate/camera integration
-- notification center
-- voice assistant integration
-- local automation panels
-- room-specific UI pages
-- elegant transitions/animations
-
-This should evolve into a polished embedded smart-home control system,
-not merely a touchscreen MQTT client.

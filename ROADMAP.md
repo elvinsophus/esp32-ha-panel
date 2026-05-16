@@ -11,7 +11,7 @@
 
 ## Phase 2 — Core Platform
 
-- [ ] Wi-Fi provisioning
+- [ ] Wi‑Fi provisioning
 - [ ] MQTT connectivity
 - [ ] OTA support
 - [ ] Basic UI framework
@@ -32,11 +32,3 @@
 - [ ] Smooth transitions
 - [ ] Idle mode
 - [ ] Power optimizations
-
-## Phase 5 — Advanced Features
-
-- [ ] Camera integration
-- [ ] Frigate events
-- [ ] Voice assistant
-- [ ] Multi-panel synchronization
-- [ ] Local automation pages
