@@ -353,6 +353,79 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
     }
 }
 
+static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
+{
+#if CONFIG_HAPANEL_MQTT_HA_DISCOVERY_ENABLE
+    const hapanel_profile_t *profile = hapanel_profile_active();
+    const esp_app_desc_t *app = esp_app_get_description();
+
+    char topic[160];
+    const int topic_len = snprintf(topic,
+                                   sizeof(topic),
+                                   "%s/sensor/hapanel_app_version/config",
+                                   CONFIG_HAPANEL_MQTT_HA_DISCOVERY_PREFIX);
+    if (topic_len < 0 || topic_len >= (int)sizeof(topic)) {
+        ESP_LOGW(TAG, "Home Assistant discovery topic truncated; skipping publish");
+        return;
+    }
+
+    char app_version[48];
+    char board_name[96];
+    char client_id[96];
+    char status_topic[128];
+    char availability_topic[128];
+
+    json_escape(app->version, app_version, sizeof(app_version));
+    json_escape(profile->board.name, board_name, sizeof(board_name));
+    json_escape(CONFIG_HAPANEL_MQTT_CLIENT_ID, client_id, sizeof(client_id));
+    json_escape(CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC, status_topic, sizeof(status_topic));
+    json_escape(CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC,
+                availability_topic,
+                sizeof(availability_topic));
+
+    char payload[768];
+    const int payload_len = snprintf(
+        payload,
+        sizeof(payload),
+        "{\"name\":\"App Version\","
+        "\"unique_id\":\"%s_app_version\","
+        "\"state_topic\":\"%s\","
+        "\"value_template\":\"{{ value_json.app_version }}\","
+        "\"availability_topic\":\"%s\","
+        "\"payload_available\":\"online\","
+        "\"payload_not_available\":\"offline\","
+        "\"json_attributes_topic\":\"%s\","
+        "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"HAPanel\","
+        "\"manufacturer\":\"HAPanel\",\"model\":\"%s\",\"sw_version\":\"%s\"},"
+        "\"origin\":{\"name\":\"HAPanel\",\"sw_version\":\"%s\"}}",
+        client_id,
+        status_topic,
+        availability_topic,
+        status_topic,
+        client_id,
+        board_name,
+        app_version,
+        app_version);
+
+    if (payload_len < 0 || payload_len >= (int)sizeof(payload)) {
+        ESP_LOGW(TAG, "Home Assistant discovery payload truncated; skipping publish");
+        return;
+    }
+
+    const int msg_id = esp_mqtt_client_publish(client, topic, payload, payload_len, 0, 1);
+    if (msg_id < 0) {
+        ESP_LOGW(TAG, "Failed to publish Home Assistant discovery");
+    } else {
+        ESP_LOGI(TAG,
+                 "Published Home Assistant discovery: topic=%s msg_id=%d",
+                 topic,
+                 msg_id);
+    }
+#else
+    (void)client;
+#endif
+}
+
 static void publish_command_result(esp_mqtt_client_handle_t client,
                                    const char *command_id,
                                    const char *command,
@@ -473,6 +546,7 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
         ESP_LOGI(TAG, "MQTT command received: status_refresh");
         publish_device_status(client);
         publish_device_state(client, true);
+        publish_home_assistant_discovery(client);
         publish_command_result(client, command_id, command, "accepted", "status refreshed");
     } else if (strcmp(command, "ui_refresh") == 0) {
         ESP_LOGI(TAG, "MQTT command received: ui_refresh");
@@ -565,6 +639,7 @@ static void mqtt_event_handler(void *handler_args,
         subscribe_command_topic(event->client);
         publish_device_status(event->client);
         publish_device_state(event->client, true);
+        publish_home_assistant_discovery(event->client);
         set_mqtt_status(CONFIG_HAPANEL_MQTT_BROKER_URI, HAPANEL_SYSTEM_LEVEL_OK);
         break;
     case MQTT_EVENT_DISCONNECTED:

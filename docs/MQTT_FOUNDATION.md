@@ -18,22 +18,37 @@ Current behavior:
   `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`
 - publishes retained live device state JSON to
   `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`
+- publishes retained Home Assistant MQTT discovery for a first app-version
+  sensor when `CONFIG_HAPANEL_MQTT_HA_DISCOVERY_ENABLE` is enabled
 - subscribes to `CONFIG_HAPANEL_MQTT_COMMAND_TOPIC` for safe foundation
   commands
 - publishes non-retained command result JSON to
   `CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC`
-- supports `{"command":"status_refresh"}` to republish device status and state
+- supports `{"command":"status_refresh"}` to republish device status, state,
+  and discovery
 - supports `{"command":"ui_refresh"}` to re-render the current status UI from
   runtime state
 - supports an optional command `id` string for result correlation
 
 Current limitation:
-- no Home Assistant discovery or entity state topics are implemented yet
+- Home Assistant discovery currently covers only the first low-risk sensor;
+  control entities and richer state sensors are still intentionally deferred
 - command handling is intentionally limited to low-risk foundation actions
 
-The next MQTT step is to add a tiny external test script for the command/result
-round trip, then start shaping Home Assistant discovery only after the topic
-model is stable.
+The next MQTT step is to expand discovery around existing retained topics before
+adding Home Assistant control commands.
+
+## Home Assistant Discovery
+
+When discovery is enabled, HAPanel publishes this retained config topic:
+
+```text
+homeassistant/sensor/hapanel_app_version/config
+```
+
+The entity reads `app_version` from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`,
+uses `CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability,
+and groups under the HAPanel device in Home Assistant.
 
 ## Local Bring-Up
 

@@ -65,4 +65,19 @@ menu "HAPanel MQTT"
             Non-retained JSON topic used to report accepted, rejected, and
             malformed command payloads.
 
+    config HAPANEL_MQTT_HA_DISCOVERY_ENABLE
+        bool "Publish Home Assistant MQTT discovery"
+        default y
+        help
+            Publish retained MQTT discovery payloads so Home Assistant can
+            create HAPanel entities automatically.
+
+    config HAPANEL_MQTT_HA_DISCOVERY_PREFIX
+        string "Home Assistant MQTT discovery prefix"
+        default "homeassistant"
+        depends on HAPANEL_MQTT_HA_DISCOVERY_ENABLE
+        help
+            MQTT discovery prefix configured in Home Assistant. The default is
+            homeassistant.
+
 endmenu
