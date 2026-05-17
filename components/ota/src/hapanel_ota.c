@@ -370,7 +370,7 @@ esp_err_t hapanel_ota_abort(hapanel_ota_session_t *session)
     return abort_result;
 }
 
-esp_err_t hapanel_ota_self_test_stage_running(hapanel_runtime_t *runtime)
+static esp_err_t stage_running_image_for_self_test(hapanel_runtime_t *runtime, bool factory_only)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
     if (running == NULL) {
@@ -378,7 +378,7 @@ esp_err_t hapanel_ota_self_test_stage_running(hapanel_runtime_t *runtime)
         return ESP_ERR_NOT_FOUND;
     }
 
-    if (running->subtype != ESP_PARTITION_SUBTYPE_APP_FACTORY) {
+    if (factory_only && running->subtype != ESP_PARTITION_SUBTYPE_APP_FACTORY) {
         ESP_LOGW(TAG, "Self-test staging is only allowed from factory; running=%s", running->label);
         set_ota_status(runtime, "Factory only", HAPANEL_SYSTEM_LEVEL_WARNING);
         return ESP_ERR_NOT_SUPPORTED;
@@ -440,6 +440,16 @@ esp_err_t hapanel_ota_self_test_stage_running(hapanel_runtime_t *runtime)
 
     ESP_LOGW(TAG, "Local OTA self-test image staged; reboot is required to exercise rollback");
     return ESP_OK;
+}
+
+esp_err_t hapanel_ota_self_test_stage_running(hapanel_runtime_t *runtime)
+{
+    return stage_running_image_for_self_test(runtime, true);
+}
+
+esp_err_t hapanel_ota_self_test_stage_any_running(hapanel_runtime_t *runtime)
+{
+    return stage_running_image_for_self_test(runtime, false);
 }
 
 esp_err_t hapanel_ota_init(hapanel_runtime_t *runtime)

@@ -17,6 +17,8 @@ Current behavior:
   finish, and abort
 - exposes an opt-in local OTA self-test staging path that copies the running
   image into the next OTA slot through the install session API
+- rejects MQTT-triggered OTA self-test staging unless
+  `CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE` is explicitly enabled
 
 Current limitation:
 - update download and transport triggers are not implemented yet
@@ -125,3 +127,10 @@ For controlled hardware bring-up, `CONFIG_HAPANEL_OTA_SELF_TEST_STAGE_FACTORY_ON
 can be enabled in a local `sdkconfig` build. This switch is default-off and only
 stages when the running partition is `factory`, preventing an OTA image from
 restaging itself on every boot.
+
+For explicit admin-triggered bring-up,
+`CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE` enables the
+`ota_self_test_stage` MQTT command. This command can stage the currently running
+image from any app partition into the inactive OTA slot and set that slot as the
+next boot target. It is default-off, writes flash only when enabled and invoked,
+and never restarts the panel automatically.

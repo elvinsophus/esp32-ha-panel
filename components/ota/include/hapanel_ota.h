@@ -58,3 +58,4 @@ esp_err_t hapanel_ota_write(hapanel_ota_session_t *session, const void *data, si
 esp_err_t hapanel_ota_finish(hapanel_ota_session_t *session);
 esp_err_t hapanel_ota_abort(hapanel_ota_session_t *session);
 esp_err_t hapanel_ota_self_test_stage_running(hapanel_runtime_t *runtime);
+esp_err_t hapanel_ota_self_test_stage_any_running(hapanel_runtime_t *runtime);

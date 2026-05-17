@@ -15,6 +15,10 @@
 #include "hapanel_profile.h"
 #include "mqtt_client.h"
 
+#ifndef CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE
+#define CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE 0
+#endif
+
 static const char *TAG = "hapanel_mqtt";
 
 static hapanel_runtime_t *mqtt_runtime;
@@ -745,6 +749,24 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
             .topic = command_topic,
             .attributes_topic = command_state_topic,
         },
+#if CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE
+        {
+            .component = "button",
+            .object_id = "hapanel_ota_self_test_stage",
+            .payload_format =
+                "{\"name\":\"Stage OTA Self-Test\","
+                "\"unique_id\":\"%s_ota_self_test_stage\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"ota_self_test_stage\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = command_state_topic,
+        },
+#endif
     };
 
     for (size_t i = 0; i < sizeof(entities) / sizeof(entities[0]); ++i) {
@@ -965,6 +987,30 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
                                preflight_result == ESP_OK && preflight.allowed ? "accepted"
                                                                                : "rejected",
                                reason);
+    } else if (strcmp(command, "ota_self_test_stage") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ota_self_test_stage");
+        if (!CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE) {
+            publish_command_result(client,
+                                   command_id,
+                                   command,
+                                   "rejected",
+                                   "self-test staging disabled");
+            return;
+        }
+
+        if (mqtt_runtime == NULL) {
+            publish_command_result(client, command_id, command, "rejected", "runtime unavailable");
+            return;
+        }
+
+        esp_err_t stage_result = hapanel_ota_self_test_stage_any_running(mqtt_runtime);
+        publish_device_state(client, true);
+        publish_command_result(client,
+                               command_id,
+                               command,
+                               stage_result == ESP_OK ? "accepted" : "rejected",
+                               stage_result == ESP_OK ? "staged; reboot needed"
+                                                      : esp_err_to_name(stage_result));
     } else {
         ESP_LOGW(TAG, "Ignoring unknown MQTT command: %s", command);
         publish_command_result(client, command_id, command, "rejected", "unknown command");

@@ -57,6 +57,7 @@ menu "HAPanel MQTT"
             Non-retained command topic for safe foundation-level panel actions.
             Supported commands are {"command":"status_refresh"},
             {"command":"ui_refresh"}, and {"command":"ota_preflight"}.
+            Development builds may also enable {"command":"ota_self_test_stage"}.
 
     config HAPANEL_MQTT_COMMAND_RESULT_TOPIC
         string "MQTT command result topic"

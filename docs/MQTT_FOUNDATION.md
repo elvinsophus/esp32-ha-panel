@@ -37,6 +37,9 @@ Current behavior:
   runtime state
 - supports `{"command":"ota_preflight"}` to run the read-only OTA readiness
   check and report the current running and target OTA slots
+- rejects `{"command":"ota_self_test_stage"}` unless
+  `CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE` is explicitly enabled for a
+  development build
 - supports an optional command `id` string for result correlation
 
 Current limitation:
@@ -94,6 +97,11 @@ The discovered buttons publish non-retained command payloads to
 preflight gate, refreshes retained device state, and publishes the result to the
 command result/state topics.
 
+`ota_self_test_stage` is development-only. When enabled, it copies the running
+app image into the inactive OTA slot through the OTA install session and sets
+that slot as the next boot target. It writes flash and changes OTA boot
+metadata, but it does not reboot automatically.
+
 The last-command-result sensor reads from
 `CONFIG_HAPANEL_MQTT_COMMAND_STATE_TOPIC`. The event-style result topic remains
 non-retained for command round-trip listeners, while the state topic is retained
@@ -118,6 +126,7 @@ and wait for the matching command result:
 .\tools\mqtt_command_test.ps1 -Command status_refresh
 .\tools\mqtt_command_test.ps1 -Command ui_refresh
 .\tools\mqtt_command_test.ps1 -Command ota_preflight
+.\tools\mqtt_command_test.ps1 -Command ota_self_test_stage -ExpectStatus rejected
 .\tools\mqtt_command_test.ps1 -Command unknown_command -ExpectStatus rejected
 ```
 

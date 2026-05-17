@@ -12,4 +12,16 @@ menu "HAPanel OTA"
             The panel does not restart automatically. Leave this disabled for
             normal firmware builds.
 
+    config HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE
+        bool "Enable MQTT-triggered OTA self-test staging"
+        default n
+        help
+            Development-only bring-up switch. When enabled, MQTT can trigger a
+            local OTA self-test that copies the currently running app image into
+            the inactive OTA slot and sets that slot as the next boot target.
+
+            This writes flash and changes the next boot partition, but it does
+            not restart the panel automatically. Leave this disabled for normal
+            firmware builds.
+
 endmenu
