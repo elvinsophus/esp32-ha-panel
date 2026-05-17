@@ -19,6 +19,85 @@ static esp_mqtt_client_handle_t mqtt_client;
 static bool event_handlers_registered;
 static bool mqtt_started;
 
+static bool topic_matches(const esp_mqtt_event_handle_t event, const char *topic)
+{
+    return event->topic_len == (int)strlen(topic) &&
+           strncmp(event->topic, topic, event->topic_len) == 0;
+}
+
+static const char *skip_ascii_space(const char *value)
+{
+    while (*value == ' ' || *value == '\t' || *value == '\r' || *value == '\n') {
+        ++value;
+    }
+
+    return value;
+}
+
+static bool is_ascii_space(char value)
+{
+    return value == ' ' || value == '\t' || value == '\r' || value == '\n';
+}
+
+static bool payload_equals(const char *payload, const char *expected)
+{
+    payload = skip_ascii_space(payload);
+    const size_t expected_len = strlen(expected);
+    if (strncmp(payload, expected, expected_len) != 0) {
+        return false;
+    }
+
+    payload += expected_len;
+    while (is_ascii_space(*payload)) {
+        ++payload;
+    }
+
+    return *payload == '\0';
+}
+
+static bool extract_command_field(const char *payload, char *command, size_t command_size)
+{
+    if (command_size == 0) {
+        return false;
+    }
+    command[0] = '\0';
+
+    const char *cursor = strstr(payload, "\"command\"");
+    if (cursor == NULL) {
+        return false;
+    }
+
+    cursor += strlen("\"command\"");
+    cursor = skip_ascii_space(cursor);
+    if (*cursor != ':') {
+        return false;
+    }
+
+    cursor = skip_ascii_space(cursor + 1);
+    if (*cursor != '"') {
+        return false;
+    }
+    ++cursor;
+
+    size_t out = 0;
+    while (*cursor != '\0' && *cursor != '"') {
+        if (*cursor == '\\') {
+            return false;
+        }
+        if (out + 1 >= command_size) {
+            return false;
+        }
+        command[out++] = *cursor++;
+    }
+
+    if (*cursor != '"') {
+        return false;
+    }
+
+    command[out] = '\0';
+    return out > 0;
+}
+
 static void json_escape(const char *input, char *output, size_t output_size)
 {
     if (output_size == 0) {
@@ -154,6 +233,56 @@ static void publish_device_status(esp_mqtt_client_handle_t client)
     }
 }
 
+static void subscribe_command_topic(esp_mqtt_client_handle_t client)
+{
+    const int msg_id = esp_mqtt_client_subscribe(client,
+                                                 CONFIG_HAPANEL_MQTT_COMMAND_TOPIC,
+                                                 0);
+    if (msg_id < 0) {
+        ESP_LOGW(TAG, "Failed to subscribe to MQTT command topic");
+    } else {
+        ESP_LOGI(TAG,
+                 "Subscribed to MQTT command topic: topic=%s msg_id=%d",
+                 CONFIG_HAPANEL_MQTT_COMMAND_TOPIC,
+                 msg_id);
+    }
+}
+
+static void handle_command_payload(esp_mqtt_client_handle_t client,
+                                   const char *payload,
+                                   int payload_len)
+{
+    if (payload_len <= 0) {
+        ESP_LOGW(TAG, "Ignoring empty MQTT command payload");
+        return;
+    }
+
+    if (payload_len >= 160) {
+        ESP_LOGW(TAG, "Ignoring oversized MQTT command payload: len=%d", payload_len);
+        return;
+    }
+
+    char payload_buffer[160];
+    memcpy(payload_buffer, payload, payload_len);
+    payload_buffer[payload_len] = '\0';
+
+    char command[48];
+    if (payload_equals(payload_buffer, "status_refresh")) {
+        strncpy(command, "status_refresh", sizeof(command));
+        command[sizeof(command) - 1] = '\0';
+    } else if (!extract_command_field(payload_buffer, command, sizeof(command))) {
+        ESP_LOGW(TAG, "Ignoring malformed MQTT command payload");
+        return;
+    }
+
+    if (strcmp(command, "status_refresh") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: status_refresh");
+        publish_device_status(client);
+    } else {
+        ESP_LOGW(TAG, "Ignoring unknown MQTT command: %s", command);
+    }
+}
+
 static void set_mqtt_status(const char *value, hapanel_system_level_t level)
 {
     hapanel_runtime_set_status(mqtt_runtime, HAPANEL_SYSTEM_MQTT, value, level);
@@ -228,6 +357,7 @@ static void mqtt_event_handler(void *handler_args,
                                 0,
                                 0,
                                 1);
+        subscribe_command_topic(event->client);
         publish_device_status(event->client);
         set_mqtt_status(CONFIG_HAPANEL_MQTT_BROKER_URI, HAPANEL_SYSTEM_LEVEL_OK);
         break;
@@ -240,10 +370,22 @@ static void mqtt_event_handler(void *handler_args,
         set_mqtt_status("Error", HAPANEL_SYSTEM_LEVEL_WARNING);
         break;
     case MQTT_EVENT_DATA:
-        ESP_LOGD(TAG,
-                 "MQTT data received: topic_len=%d data_len=%d",
-                 event->topic_len,
-                 event->data_len);
+        if (topic_matches(event, CONFIG_HAPANEL_MQTT_COMMAND_TOPIC)) {
+            if (event->current_data_offset != 0 || event->total_data_len != event->data_len) {
+                ESP_LOGW(TAG,
+                         "Ignoring fragmented MQTT command payload: offset=%d total=%d len=%d",
+                         event->current_data_offset,
+                         event->total_data_len,
+                         event->data_len);
+                break;
+            }
+            handle_command_payload(event->client, event->data, event->data_len);
+        } else {
+            ESP_LOGD(TAG,
+                     "MQTT data received: topic_len=%d data_len=%d",
+                     event->topic_len,
+                     event->data_len);
+        }
         break;
     default:
         ESP_LOGD(TAG, "MQTT event id=%" PRIi32, event_id);
