@@ -18,8 +18,8 @@ Current behavior:
   `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`
 - publishes retained live device state JSON to
   `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`
-- publishes retained Home Assistant MQTT discovery for a first app-version
-  sensor when `CONFIG_HAPANEL_MQTT_HA_DISCOVERY_ENABLE` is enabled
+- publishes retained Home Assistant MQTT discovery for early diagnostic
+  entities when `CONFIG_HAPANEL_MQTT_HA_DISCOVERY_ENABLE` is enabled
 - subscribes to `CONFIG_HAPANEL_MQTT_COMMAND_TOPIC` for safe foundation
   commands
 - publishes non-retained command result JSON to
@@ -31,7 +31,7 @@ Current behavior:
 - supports an optional command `id` string for result correlation
 
 Current limitation:
-- Home Assistant discovery currently covers only the first low-risk sensor;
+- Home Assistant discovery currently covers only low-risk diagnostic entities;
   control entities and richer state sensors are still intentionally deferred
 - command handling is intentionally limited to low-risk foundation actions
 
@@ -44,11 +44,15 @@ When discovery is enabled, HAPanel publishes this retained config topic:
 
 ```text
 homeassistant/sensor/hapanel_app_version/config
+homeassistant/sensor/hapanel_uptime/config
+homeassistant/binary_sensor/hapanel_psram_ready/config
 ```
 
-The entity reads `app_version` from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`,
-uses `CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability,
-and groups under the HAPanel device in Home Assistant.
+The app-version entity reads from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`.
+The uptime and PSRAM readiness entities read from
+`CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`. All discovered entities use
+`CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability and
+group under the HAPanel device in Home Assistant.
 
 ## Local Bring-Up
 
