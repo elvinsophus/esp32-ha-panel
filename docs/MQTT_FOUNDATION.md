@@ -45,12 +45,16 @@ When discovery is enabled, HAPanel publishes this retained config topic:
 ```text
 homeassistant/sensor/hapanel_app_version/config
 homeassistant/sensor/hapanel_uptime/config
+homeassistant/sensor/hapanel_wifi_status/config
+homeassistant/sensor/hapanel_mqtt_status/config
 homeassistant/binary_sensor/hapanel_psram_ready/config
 ```
 
 The app-version entity reads from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`.
-The uptime and PSRAM readiness entities read from
-`CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`. All discovered entities use
+The uptime, Wi-Fi status, MQTT status, and PSRAM readiness entities read from
+`CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`. Wi-Fi and MQTT are also exposed as
+top-level `wifi` and `mqtt` objects in the retained state payload so discovery
+templates do not depend on service-array ordering. All discovered entities use
 `CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability and
 group under the HAPanel device in Home Assistant.
 

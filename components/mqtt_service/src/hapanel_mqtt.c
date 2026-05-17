@@ -283,6 +283,24 @@ static bool append_text(char *buffer, size_t buffer_size, size_t *offset, const 
     return true;
 }
 
+static bool append_status_item_object(char *buffer,
+                                      size_t buffer_size,
+                                      size_t *offset,
+                                      const char *field,
+                                      const hapanel_system_status_item_t *item)
+{
+    char value[128];
+    json_escape(item->value, value, sizeof(value));
+
+    return append_text(buffer,
+                       buffer_size,
+                       offset,
+                       "\"%s\":{\"value\":\"%s\",\"level\":\"%s\"},",
+                       field,
+                       value,
+                       system_level_name(item->level));
+}
+
 static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
 {
     if (mqtt_runtime == NULL || client == NULL || !mqtt_connected) {
@@ -294,7 +312,7 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
         return;
     }
 
-    char payload[1280];
+    char payload[1536];
     size_t offset = 0;
     if (!append_text(payload,
                      sizeof(payload),
@@ -302,12 +320,30 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
                      "{\"schema\":\"hapanel.device_state.v1\","
                      "\"revision\":%" PRIu32 ","
                      "\"uptime_ms\":%" PRIu64 ","
-                     "\"psram_ready\":%s,"
-                     "\"services\":[",
+                     "\"psram_ready\":%s,",
                      status->revision,
                      (uint64_t)(esp_timer_get_time() / 1000),
                      status->psram_ready ? "true" : "false")) {
         ESP_LOGW(TAG, "MQTT device state payload header truncated; skipping publish");
+        return;
+    }
+
+    if (!append_status_item_object(payload,
+                                   sizeof(payload),
+                                   &offset,
+                                   "wifi",
+                                   &status->items[HAPANEL_SYSTEM_WIFI]) ||
+        !append_status_item_object(payload,
+                                   sizeof(payload),
+                                   &offset,
+                                   "mqtt",
+                                   &status->items[HAPANEL_SYSTEM_MQTT])) {
+        ESP_LOGW(TAG, "MQTT device state connectivity payload truncated; skipping publish");
+        return;
+    }
+
+    if (!append_text(payload, sizeof(payload), &offset, "\"services\":[")) {
+        ESP_LOGW(TAG, "MQTT device state services header truncated; skipping publish");
         return;
     }
 
@@ -442,6 +478,36 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"value_template\":\"{{ 'ON' if value_json.psram_ready else 'OFF' }}\","
                 "\"payload_on\":\"ON\","
                 "\"payload_off\":\"OFF\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .state_topic = state_topic,
+        },
+        {
+            .component = "sensor",
+            .object_id = "hapanel_wifi_status",
+            .payload_format =
+                "{\"name\":\"Wi-Fi Status\","
+                "\"unique_id\":\"%s_wifi_status\","
+                "\"entity_category\":\"diagnostic\","
+                "\"state_topic\":\"%s\","
+                "\"value_template\":\"{{ value_json.wifi.value }}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .state_topic = state_topic,
+        },
+        {
+            .component = "sensor",
+            .object_id = "hapanel_mqtt_status",
+            .payload_format =
+                "{\"name\":\"MQTT Status\","
+                "\"unique_id\":\"%s_mqtt_status\","
+                "\"entity_category\":\"diagnostic\","
+                "\"state_topic\":\"%s\","
+                "\"value_template\":\"{{ value_json.mqtt.value }}\","
                 "\"availability_topic\":\"%s\","
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","
