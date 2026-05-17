@@ -10,6 +10,14 @@
 #include "hapanel_runtime.h"
 
 typedef struct {
+    bool present;
+    char label[17];
+    uint8_t subtype;
+    uint32_t address;
+    uint32_t size;
+} hapanel_ota_partition_info_t;
+
+typedef struct {
     bool allowed;
     const char *reason;
     const char *running_label;
@@ -17,6 +25,18 @@ typedef struct {
     uint32_t target_address;
     uint32_t target_size;
 } hapanel_ota_preflight_t;
+
+typedef struct {
+    hapanel_ota_partition_info_t running;
+    hapanel_ota_partition_info_t boot;
+    hapanel_ota_partition_info_t factory;
+    hapanel_ota_partition_info_t ota_0;
+    hapanel_ota_partition_info_t ota_1;
+    hapanel_ota_partition_info_t target;
+    bool boot_matches_running;
+    bool rollback_enabled;
+    const char *running_state;
+} hapanel_ota_inventory_t;
 
 typedef struct {
     bool active;
@@ -30,6 +50,7 @@ typedef struct {
 esp_err_t hapanel_ota_init(hapanel_runtime_t *runtime);
 esp_err_t hapanel_ota_mark_boot_valid(hapanel_runtime_t *runtime);
 esp_err_t hapanel_ota_preflight(hapanel_ota_preflight_t *preflight);
+esp_err_t hapanel_ota_get_inventory(hapanel_ota_inventory_t *inventory);
 esp_err_t hapanel_ota_begin(hapanel_runtime_t *runtime,
                             hapanel_ota_session_t *session,
                             size_t image_size);

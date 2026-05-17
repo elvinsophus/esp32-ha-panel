@@ -309,11 +309,14 @@ static bool append_ota_state_object(char *buffer,
 {
     hapanel_ota_preflight_t preflight = {0};
     (void)hapanel_ota_preflight(&preflight);
+    hapanel_ota_inventory_t inventory = {0};
+    (void)hapanel_ota_get_inventory(&inventory);
 
     char value[128];
     char reason[96];
     char running_label[32];
     char target_label[32];
+    char running_state[32];
     json_escape(item->value, value, sizeof(value));
     json_escape(preflight.reason != NULL ? preflight.reason : "unknown", reason, sizeof(reason));
     json_escape(preflight.running_label != NULL ? preflight.running_label : "none",
@@ -322,6 +325,9 @@ static bool append_ota_state_object(char *buffer,
     json_escape(preflight.target_label != NULL ? preflight.target_label : "none",
                 target_label,
                 sizeof(target_label));
+    json_escape(inventory.running_state != NULL ? inventory.running_state : "unknown",
+                running_state,
+                sizeof(running_state));
 
     return append_text(buffer,
                        buffer_size,
@@ -329,7 +335,19 @@ static bool append_ota_state_object(char *buffer,
                        "\"ota\":{\"value\":\"%s\",\"level\":\"%s\","
                        "\"preflight\":{\"allowed\":%s,\"reason\":\"%s\","
                        "\"running\":\"%s\",\"target\":\"%s\","
-                       "\"target_address\":%" PRIu32 ",\"target_size\":%" PRIu32 "}},",
+                       "\"target_address\":%" PRIu32 ",\"target_size\":%" PRIu32 "},"
+                       "\"inventory\":{\"boot_matches_running\":%s,\"rollback_enabled\":%s,"
+                       "\"running_state\":\"%s\","
+                       "\"running\":{\"present\":%s,\"label\":\"%s\",\"address\":%" PRIu32
+                       ",\"size\":%" PRIu32 "},"
+                       "\"boot\":{\"present\":%s,\"label\":\"%s\",\"address\":%" PRIu32
+                       ",\"size\":%" PRIu32 "},"
+                       "\"factory\":{\"present\":%s,\"label\":\"%s\",\"address\":%" PRIu32
+                       ",\"size\":%" PRIu32 "},"
+                       "\"ota_0\":{\"present\":%s,\"label\":\"%s\",\"address\":%" PRIu32
+                       ",\"size\":%" PRIu32 "},"
+                       "\"ota_1\":{\"present\":%s,\"label\":\"%s\",\"address\":%" PRIu32
+                       ",\"size\":%" PRIu32 "}}},",
                        value,
                        system_level_name(item->level),
                        preflight.allowed ? "true" : "false",
@@ -337,7 +355,30 @@ static bool append_ota_state_object(char *buffer,
                        running_label,
                        target_label,
                        preflight.target_address,
-                       preflight.target_size);
+                       preflight.target_size,
+                       inventory.boot_matches_running ? "true" : "false",
+                       inventory.rollback_enabled ? "true" : "false",
+                       running_state,
+                       inventory.running.present ? "true" : "false",
+                       inventory.running.label,
+                       inventory.running.address,
+                       inventory.running.size,
+                       inventory.boot.present ? "true" : "false",
+                       inventory.boot.label,
+                       inventory.boot.address,
+                       inventory.boot.size,
+                       inventory.factory.present ? "true" : "false",
+                       inventory.factory.label,
+                       inventory.factory.address,
+                       inventory.factory.size,
+                       inventory.ota_0.present ? "true" : "false",
+                       inventory.ota_0.label,
+                       inventory.ota_0.address,
+                       inventory.ota_0.size,
+                       inventory.ota_1.present ? "true" : "false",
+                       inventory.ota_1.label,
+                       inventory.ota_1.address,
+                       inventory.ota_1.size);
 }
 
 static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
@@ -351,7 +392,7 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
         return;
     }
 
-    char payload[1792];
+    char payload[2304];
     size_t offset = 0;
     if (!append_text(payload,
                      sizeof(payload),

@@ -18,7 +18,7 @@ Current behavior:
   `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`
 - publishes retained live device state JSON to
   `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`, including read-only OTA preflight
-  details
+  and partition inventory details
 - publishes retained Home Assistant MQTT discovery for early diagnostic
   entities when `CONFIG_HAPANEL_MQTT_HA_DISCOVERY_ENABLE` is enabled
 - publishes retained Home Assistant MQTT discovery for diagnostic command
@@ -74,6 +74,9 @@ Wi-Fi, MQTT, and OTA are also exposed as top-level `wifi`, `mqtt`, and `ota`
 objects in the retained state payload so discovery templates do not depend on
 service-array ordering. The top-level `ota.preflight` object reports whether
 the OTA gate is open, its reason, the running slot, and the next target slot.
+The top-level `ota.inventory` object reports the running, boot, factory,
+`ota_0`, and `ota_1` partitions, boot/running agreement, rollback support, and
+running image state.
 All discovered entities use
 `CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability and
 group under the HAPanel device in Home Assistant.

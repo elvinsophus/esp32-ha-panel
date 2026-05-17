@@ -33,6 +33,27 @@ static void log_partition(const char *role, const esp_partition_t *partition)
              partition->size);
 }
 
+static void copy_partition_info(hapanel_ota_partition_info_t *info,
+                                const esp_partition_t *partition)
+{
+    if (info == NULL) {
+        return;
+    }
+
+    *info = (hapanel_ota_partition_info_t){0};
+    if (partition == NULL) {
+        return;
+    }
+
+    info->present = true;
+    const size_t label_len = strnlen(partition->label, sizeof(info->label) - 1);
+    memcpy(info->label, partition->label, label_len);
+    info->label[label_len] = '\0';
+    info->subtype = partition->subtype;
+    info->address = partition->address;
+    info->size = partition->size;
+}
+
 static void set_ota_status(hapanel_runtime_t *runtime,
                            const char *value,
                            hapanel_system_level_t level)
@@ -142,6 +163,64 @@ esp_err_t hapanel_ota_preflight(hapanel_ota_preflight_t *preflight)
     set_preflight_result(preflight, true, "ready", running, target);
     log_preflight(preflight);
     return ESP_OK;
+}
+
+esp_err_t hapanel_ota_get_inventory(hapanel_ota_inventory_t *inventory)
+{
+    if (inventory == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *inventory = (hapanel_ota_inventory_t){
+#ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+        .rollback_enabled = true,
+#else
+        .rollback_enabled = false,
+#endif
+        .running_state = "unavailable",
+    };
+
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    const esp_partition_t *ota_data = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+                                                               ESP_PARTITION_SUBTYPE_DATA_OTA,
+                                                               NULL);
+    const esp_partition_t *boot = ota_data != NULL ? esp_ota_get_boot_partition() : running;
+    const esp_partition_t *factory = esp_partition_find_first(ESP_PARTITION_TYPE_APP,
+                                                              ESP_PARTITION_SUBTYPE_APP_FACTORY,
+                                                              NULL);
+    const esp_partition_t *ota_0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP,
+                                                            ESP_PARTITION_SUBTYPE_APP_OTA_0,
+                                                            NULL);
+    const esp_partition_t *ota_1 = esp_partition_find_first(ESP_PARTITION_TYPE_APP,
+                                                            ESP_PARTITION_SUBTYPE_APP_OTA_1,
+                                                            NULL);
+    const esp_partition_t *target = esp_ota_get_next_update_partition(NULL);
+
+    copy_partition_info(&inventory->running, running);
+    copy_partition_info(&inventory->boot, boot);
+    copy_partition_info(&inventory->factory, factory);
+    copy_partition_info(&inventory->ota_0, ota_0);
+    copy_partition_info(&inventory->ota_1, ota_1);
+    copy_partition_info(&inventory->target, target);
+    inventory->boot_matches_running = running != NULL && boot != NULL && running == boot;
+
+#ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+    if (running != NULL) {
+        esp_ota_img_states_t running_state = ESP_OTA_IMG_UNDEFINED;
+        esp_err_t state_result = get_running_ota_state(running, &running_state);
+        if (state_result == ESP_OK) {
+            inventory->running_state = ota_state_name(running_state);
+        } else if (state_result == ESP_ERR_NOT_SUPPORTED || state_result == ESP_ERR_NOT_FOUND) {
+            inventory->running_state = "undefined";
+        } else {
+            inventory->running_state = "unknown";
+        }
+    }
+#else
+    inventory->running_state = "rollback_disabled";
+#endif
+
+    return running != NULL && boot != NULL ? ESP_OK : ESP_ERR_NOT_FOUND;
 }
 
 esp_err_t hapanel_ota_begin(hapanel_runtime_t *runtime,

@@ -11,8 +11,8 @@ Current behavior:
   initialization succeed
 - runs an OTA preflight check that selects the next update slot and blocks
   updates while the running image still needs validation
-- exposes the read-only OTA preflight result in retained MQTT device state and
-  Home Assistant diagnostic entities
+- exposes the read-only OTA preflight result and partition inventory in retained
+  MQTT device state and Home Assistant diagnostic entities
 - exposes a transport-agnostic OTA install session API for begin, write,
   finish, and abort
 - exposes an opt-in local OTA self-test staging path that copies the running
@@ -84,6 +84,14 @@ update triggers must pass before starting an OTA write. It reports:
 - the target OTA slot, address, and size
 
 The preflight does not erase, write, download, or switch boot partitions.
+
+## Partition Inventory
+
+`hapanel_ota_get_inventory()` exposes the read-only OTA partition snapshot used
+by MQTT diagnostics. It reports the running, boot, factory, `ota_0`, `ota_1`,
+and next target partitions, whether the configured boot partition matches the
+running partition, whether rollback is enabled, and the running OTA image state
+when ESP-IDF exposes it.
 
 ## Install Session
 
