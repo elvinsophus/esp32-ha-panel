@@ -6,6 +6,7 @@ idf_component_register(
     REQUIRES
         esp_app_format
         esp_event
+        esp_timer
         esp_wifi
         profile
         mqtt

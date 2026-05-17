@@ -34,6 +34,17 @@ static void sync_ui_status(hapanel_runtime_t *runtime)
     runtime->ui_status.psram_ready = system_status->psram_ready;
 }
 
+static void notify_status_changed(hapanel_runtime_t *runtime)
+{
+    if (runtime->status_callback != NULL) {
+        runtime->status_callback(runtime->status_context);
+    }
+
+    if (runtime->refresh_callback != NULL) {
+        runtime->refresh_callback(runtime->refresh_context);
+    }
+}
+
 void hapanel_runtime_init(hapanel_runtime_t *runtime)
 {
     if (runtime == NULL) {
@@ -51,10 +62,13 @@ void hapanel_runtime_set_psram_ready(hapanel_runtime_t *runtime, bool ready)
         return;
     }
 
+    const uint32_t previous_revision = runtime->system_status.revision;
     hapanel_system_status_set_psram_ready(&runtime->system_status, ready);
-    if (runtime->refresh_callback != NULL) {
-        runtime->refresh_callback(runtime->refresh_context);
+    if (runtime->system_status.revision == previous_revision) {
+        return;
     }
+
+    notify_status_changed(runtime);
 }
 
 void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
@@ -66,10 +80,13 @@ void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
         return;
     }
 
+    const uint32_t previous_revision = runtime->system_status.revision;
     hapanel_system_status_set(&runtime->system_status, subsystem, value, level);
-    if (runtime->refresh_callback != NULL) {
-        runtime->refresh_callback(runtime->refresh_context);
+    if (runtime->system_status.revision == previous_revision) {
+        return;
     }
+
+    notify_status_changed(runtime);
 }
 
 void hapanel_runtime_set_refresh_callback(hapanel_runtime_t *runtime,
@@ -82,6 +99,18 @@ void hapanel_runtime_set_refresh_callback(hapanel_runtime_t *runtime,
 
     runtime->refresh_callback = callback;
     runtime->refresh_context = context;
+}
+
+void hapanel_runtime_set_status_callback(hapanel_runtime_t *runtime,
+                                         void (*callback)(void *context),
+                                         void *context)
+{
+    if (runtime == NULL) {
+        return;
+    }
+
+    runtime->status_callback = callback;
+    runtime->status_context = context;
 }
 
 void hapanel_runtime_render_root(hapanel_runtime_t *runtime)

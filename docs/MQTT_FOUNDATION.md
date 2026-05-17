@@ -16,16 +16,19 @@ Current behavior:
 - configures a retained `offline` last-will message
 - publishes retained structured device status JSON to
   `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`
+- publishes retained live device state JSON to
+  `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`
 - subscribes to `CONFIG_HAPANEL_MQTT_COMMAND_TOPIC` for safe foundation
   commands
-- supports `{"command":"status_refresh"}` to republish device status
+- supports `{"command":"status_refresh"}` to republish device status and state
 
 Current limitation:
 - no Home Assistant discovery or entity state topics are implemented yet
 - command handling is intentionally limited to low-risk foundation actions
 
-The next MQTT step is to add one observable device state topic beyond static
-status. Add Home Assistant discovery only after the topic model is stable.
+The next MQTT step is to introduce one small command that changes local panel
+state without affecting boot, storage, or OTA safety. Add Home Assistant
+discovery only after the topic model is stable.
 
 ## Local Bring-Up
 

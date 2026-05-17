@@ -2,12 +2,14 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp_wifi.h"
 #include "hapanel_profile.h"
 #include "mqtt_client.h"
@@ -18,6 +20,8 @@ static hapanel_runtime_t *mqtt_runtime;
 static esp_mqtt_client_handle_t mqtt_client;
 static bool event_handlers_registered;
 static bool mqtt_started;
+static bool mqtt_connected;
+static uint32_t published_state_revision;
 
 static bool topic_matches(const esp_mqtt_event_handle_t event, const char *topic)
 {
@@ -233,6 +237,119 @@ static void publish_device_status(esp_mqtt_client_handle_t client)
     }
 }
 
+static const char *system_level_name(hapanel_system_level_t level)
+{
+    switch (level) {
+    case HAPANEL_SYSTEM_LEVEL_OK:
+        return "ok";
+    case HAPANEL_SYSTEM_LEVEL_PENDING:
+        return "pending";
+    case HAPANEL_SYSTEM_LEVEL_OFFLINE:
+        return "offline";
+    case HAPANEL_SYSTEM_LEVEL_WARNING:
+        return "warning";
+    case HAPANEL_SYSTEM_LEVEL_ERROR:
+        return "error";
+    default:
+        return "unknown";
+    }
+}
+
+static bool append_text(char *buffer, size_t buffer_size, size_t *offset, const char *format, ...)
+{
+    if (*offset >= buffer_size) {
+        return false;
+    }
+
+    va_list args;
+    va_start(args, format);
+    const int written = vsnprintf(&buffer[*offset], buffer_size - *offset, format, args);
+    va_end(args);
+
+    if (written < 0 || written >= (int)(buffer_size - *offset)) {
+        return false;
+    }
+
+    *offset += written;
+    return true;
+}
+
+static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
+{
+    if (mqtt_runtime == NULL || client == NULL || !mqtt_connected) {
+        return;
+    }
+
+    const hapanel_system_status_t *status = &mqtt_runtime->system_status;
+    if (!force && published_state_revision == status->revision) {
+        return;
+    }
+
+    char payload[1280];
+    size_t offset = 0;
+    if (!append_text(payload,
+                     sizeof(payload),
+                     &offset,
+                     "{\"schema\":\"hapanel.device_state.v1\","
+                     "\"revision\":%" PRIu32 ","
+                     "\"uptime_ms\":%" PRIu64 ","
+                     "\"psram_ready\":%s,"
+                     "\"services\":[",
+                     status->revision,
+                     (uint64_t)(esp_timer_get_time() / 1000),
+                     status->psram_ready ? "true" : "false")) {
+        ESP_LOGW(TAG, "MQTT device state payload header truncated; skipping publish");
+        return;
+    }
+
+    for (size_t i = 0; i < status->item_count; ++i) {
+        char label[64];
+        char value[128];
+        json_escape(status->items[i].label, label, sizeof(label));
+        json_escape(status->items[i].value, value, sizeof(value));
+
+        if (!append_text(payload,
+                         sizeof(payload),
+                         &offset,
+                         "%s{\"label\":\"%s\",\"value\":\"%s\",\"level\":\"%s\"}",
+                         i == 0 ? "" : ",",
+                         label,
+                         value,
+                         system_level_name(status->items[i].level))) {
+            ESP_LOGW(TAG, "MQTT device state payload truncated; skipping publish");
+            return;
+        }
+    }
+
+    if (!append_text(payload, sizeof(payload), &offset, "]}")) {
+        ESP_LOGW(TAG, "MQTT device state payload footer truncated; skipping publish");
+        return;
+    }
+
+    const int msg_id = esp_mqtt_client_publish(client,
+                                               CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC,
+                                               payload,
+                                               (int)offset,
+                                               0,
+                                               1);
+    if (msg_id < 0) {
+        ESP_LOGW(TAG, "Failed to publish MQTT device state");
+    } else {
+        published_state_revision = status->revision;
+        ESP_LOGI(TAG,
+                 "Published MQTT device state: topic=%s revision=%" PRIu32 " msg_id=%d",
+                 CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC,
+                 status->revision,
+                 msg_id);
+    }
+}
+
+static void status_change_callback(void *context)
+{
+    (void)context;
+    publish_device_state(mqtt_client, false);
+}
+
 static void subscribe_command_topic(esp_mqtt_client_handle_t client)
 {
     const int msg_id = esp_mqtt_client_subscribe(client,
@@ -278,6 +395,7 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
     if (strcmp(command, "status_refresh") == 0) {
         ESP_LOGI(TAG, "MQTT command received: status_refresh");
         publish_device_status(client);
+        publish_device_state(client, true);
     } else {
         ESP_LOGW(TAG, "Ignoring unknown MQTT command: %s", command);
     }
@@ -351,6 +469,7 @@ static void mqtt_event_handler(void *handler_args,
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT connected");
+        mqtt_connected = true;
         esp_mqtt_client_publish(event->client,
                                 CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC,
                                 "online",
@@ -359,10 +478,12 @@ static void mqtt_event_handler(void *handler_args,
                                 1);
         subscribe_command_topic(event->client);
         publish_device_status(event->client);
+        publish_device_state(event->client, true);
         set_mqtt_status(CONFIG_HAPANEL_MQTT_BROKER_URI, HAPANEL_SYSTEM_LEVEL_OK);
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGW(TAG, "MQTT disconnected");
+        mqtt_connected = false;
         set_mqtt_status("Disconnected", HAPANEL_SYSTEM_LEVEL_OFFLINE);
         break;
     case MQTT_EVENT_ERROR:
@@ -400,6 +521,7 @@ esp_err_t hapanel_mqtt_start(hapanel_runtime_t *runtime)
     }
 
     mqtt_runtime = runtime;
+    hapanel_runtime_set_status_callback(runtime, status_change_callback, NULL);
 
     if (!has_configured_broker()) {
         ESP_LOGI(TAG, "MQTT broker is not configured");

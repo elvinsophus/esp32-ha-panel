@@ -14,12 +14,17 @@ typedef struct {
     bool root_visible;
     void (*refresh_callback)(void *context);
     void *refresh_context;
+    void (*status_callback)(void *context);
+    void *status_context;
 } hapanel_runtime_t;
 
 void hapanel_runtime_init(hapanel_runtime_t *runtime);
 void hapanel_runtime_set_refresh_callback(hapanel_runtime_t *runtime,
                                           void (*callback)(void *context),
                                           void *context);
+void hapanel_runtime_set_status_callback(hapanel_runtime_t *runtime,
+                                         void (*callback)(void *context),
+                                         void *context);
 void hapanel_runtime_set_psram_ready(hapanel_runtime_t *runtime, bool ready);
 void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
                                 hapanel_system_subsystem_t subsystem,

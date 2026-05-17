@@ -43,6 +43,13 @@ menu "HAPanel MQTT"
             Retained JSON topic with a minimal structured device status payload.
             This is the stable foundation for future Home Assistant discovery.
 
+    config HAPANEL_MQTT_DEVICE_STATE_TOPIC
+        string "MQTT device state topic"
+        default "hapanel/device/state"
+        help
+            Retained JSON topic with live panel state such as service statuses,
+            runtime revision, uptime, and PSRAM readiness.
+
     config HAPANEL_MQTT_COMMAND_TOPIC
         string "MQTT command topic"
         default "hapanel/device/command"
