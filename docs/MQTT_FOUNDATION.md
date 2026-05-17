@@ -40,3 +40,18 @@ model is stable.
 Copy `sdkconfig.defaults.local.example` to `sdkconfig.defaults.local` and fill in
 the Wi-Fi and MQTT values for the test environment. The local file is ignored by
 Git and is loaded by CMake when present.
+
+## Command Test
+
+Use `tools/mqtt_command_test.ps1` from the repository root to publish a command
+and wait for the matching command result:
+
+```powershell
+.\tools\mqtt_command_test.ps1 -Command status_refresh
+.\tools\mqtt_command_test.ps1 -Command ui_refresh
+.\tools\mqtt_command_test.ps1 -Command unknown_command -ExpectStatus rejected
+```
+
+The script reads broker, credential, command topic, and result topic settings
+from `sdkconfig` and `sdkconfig.defaults.local`. It prints the JSON result
+payload and exits with an error if the expected result does not arrive.
