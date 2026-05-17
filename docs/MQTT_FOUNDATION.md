@@ -20,6 +20,8 @@ Current behavior:
   `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`
 - publishes retained Home Assistant MQTT discovery for early diagnostic
   entities when `CONFIG_HAPANEL_MQTT_HA_DISCOVERY_ENABLE` is enabled
+- publishes retained Home Assistant MQTT discovery for diagnostic command
+  buttons that use the existing safe command topic
 - subscribes to `CONFIG_HAPANEL_MQTT_COMMAND_TOPIC` for safe foundation
   commands
 - publishes non-retained command result JSON to
@@ -49,6 +51,8 @@ homeassistant/sensor/hapanel_wifi_status/config
 homeassistant/sensor/hapanel_mqtt_status/config
 homeassistant/sensor/hapanel_ota_status/config
 homeassistant/binary_sensor/hapanel_psram_ready/config
+homeassistant/button/hapanel_status_refresh/config
+homeassistant/button/hapanel_ui_refresh/config
 ```
 
 The app-version entity reads from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`.
@@ -59,6 +63,14 @@ state payload so discovery templates do not depend on service-array ordering.
 All discovered entities use
 `CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability and
 group under the HAPanel device in Home Assistant.
+
+The discovered buttons publish non-retained command payloads to
+`CONFIG_HAPANEL_MQTT_COMMAND_TOPIC`:
+
+```json
+{"command":"status_refresh"}
+{"command":"ui_refresh"}
+```
 
 ## Local Bring-Up
 

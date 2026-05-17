@@ -405,6 +405,7 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
     char client_id[96];
     char status_topic[128];
     char state_topic[128];
+    char command_topic[128];
     char availability_topic[128];
 
     json_escape(app->version, app_version, sizeof(app_version));
@@ -412,6 +413,7 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
     json_escape(CONFIG_HAPANEL_MQTT_CLIENT_ID, client_id, sizeof(client_id));
     json_escape(CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC, status_topic, sizeof(status_topic));
     json_escape(CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC, state_topic, sizeof(state_topic));
+    json_escape(CONFIG_HAPANEL_MQTT_COMMAND_TOPIC, command_topic, sizeof(command_topic));
     json_escape(CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC,
                 availability_topic,
                 sizeof(availability_topic));
@@ -437,7 +439,8 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
         const char *component;
         const char *object_id;
         const char *payload_format;
-        const char *state_topic;
+        const char *topic;
+        const char *attributes_topic;
     } entities[] = {
         {
             .component = "sensor",
@@ -452,7 +455,8 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","
                 "\"json_attributes_topic\":\"%s\",%s}",
-            .state_topic = status_topic,
+            .topic = status_topic,
+            .attributes_topic = status_topic,
         },
         {
             .component = "sensor",
@@ -469,7 +473,8 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","
                 "\"json_attributes_topic\":\"%s\",%s}",
-            .state_topic = state_topic,
+            .topic = state_topic,
+            .attributes_topic = state_topic,
         },
         {
             .component = "binary_sensor",
@@ -487,7 +492,8 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","
                 "\"json_attributes_topic\":\"%s\",%s}",
-            .state_topic = state_topic,
+            .topic = state_topic,
+            .attributes_topic = state_topic,
         },
         {
             .component = "sensor",
@@ -502,7 +508,8 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","
                 "\"json_attributes_topic\":\"%s\",%s}",
-            .state_topic = state_topic,
+            .topic = state_topic,
+            .attributes_topic = state_topic,
         },
         {
             .component = "sensor",
@@ -517,7 +524,8 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","
                 "\"json_attributes_topic\":\"%s\",%s}",
-            .state_topic = state_topic,
+            .topic = state_topic,
+            .attributes_topic = state_topic,
         },
         {
             .component = "sensor",
@@ -532,7 +540,40 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","
                 "\"json_attributes_topic\":\"%s\",%s}",
-            .state_topic = state_topic,
+            .topic = state_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "button",
+            .object_id = "hapanel_status_refresh",
+            .payload_format =
+                "{\"name\":\"Refresh Status\","
+                "\"unique_id\":\"%s_status_refresh\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"status_refresh\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "button",
+            .object_id = "hapanel_ui_refresh",
+            .payload_format =
+                "{\"name\":\"Refresh UI\","
+                "\"unique_id\":\"%s_ui_refresh\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"ui_refresh\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = state_topic,
         },
     };
 
@@ -554,9 +595,9 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                                          sizeof(payload),
                                          entities[i].payload_format,
                                          client_id,
-                                         entities[i].state_topic,
+                                         entities[i].topic,
                                          availability_topic,
-                                         entities[i].state_topic,
+                                         entities[i].attributes_topic,
                                          device_json);
 
         if (payload_len < 0 || payload_len >= (int)sizeof(payload)) {

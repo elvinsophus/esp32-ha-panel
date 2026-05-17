@@ -141,7 +141,7 @@ $hostName = $uri.Host
 $port = if ($uri.Port -gt 0) { $uri.Port } else { 1883 }
 $username = Get-HAPanelConfig "CONFIG_HAPANEL_MQTT_USERNAME"
 $password = Get-HAPanelConfig "CONFIG_HAPANEL_MQTT_PASSWORD"
-$clientId = (Get-HAPanelConfig "CONFIG_HAPANEL_MQTT_CLIENT_ID" "hapanel") + "-command-test"
+$clientId = (Get-HAPanelConfig "CONFIG_HAPANEL_MQTT_CLIENT_ID" "hapanel") + "-command-test-" + $Id
 $commandTopic = Get-HAPanelConfig "CONFIG_HAPANEL_MQTT_COMMAND_TOPIC" "hapanel/device/command"
 $resultTopic = Get-HAPanelConfig "CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC" "hapanel/device/command/result"
 
