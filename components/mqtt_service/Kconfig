@@ -58,4 +58,11 @@ menu "HAPanel MQTT"
             Supported commands are {"command":"status_refresh"} and
             {"command":"ui_refresh"}.
 
+    config HAPANEL_MQTT_COMMAND_RESULT_TOPIC
+        string "MQTT command result topic"
+        default "hapanel/device/command/result"
+        help
+            Non-retained JSON topic used to report accepted, rejected, and
+            malformed command payloads.
+
 endmenu

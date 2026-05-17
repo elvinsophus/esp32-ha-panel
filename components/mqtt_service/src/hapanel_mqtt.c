@@ -59,19 +59,28 @@ static bool payload_equals(const char *payload, const char *expected)
     return *payload == '\0';
 }
 
-static bool extract_command_field(const char *payload, char *command, size_t command_size)
+static bool extract_json_string_field(const char *payload,
+                                      const char *field,
+                                      char *value,
+                                      size_t value_size)
 {
-    if (command_size == 0) {
+    if (value_size == 0) {
         return false;
     }
-    command[0] = '\0';
+    value[0] = '\0';
 
-    const char *cursor = strstr(payload, "\"command\"");
+    char pattern[48];
+    const int pattern_len = snprintf(pattern, sizeof(pattern), "\"%s\"", field);
+    if (pattern_len < 0 || pattern_len >= (int)sizeof(pattern)) {
+        return false;
+    }
+
+    const char *cursor = strstr(payload, pattern);
     if (cursor == NULL) {
         return false;
     }
 
-    cursor += strlen("\"command\"");
+    cursor += strlen(pattern);
     cursor = skip_ascii_space(cursor);
     if (*cursor != ':') {
         return false;
@@ -88,17 +97,17 @@ static bool extract_command_field(const char *payload, char *command, size_t com
         if (*cursor == '\\') {
             return false;
         }
-        if (out + 1 >= command_size) {
+        if (out + 1 >= value_size) {
             return false;
         }
-        command[out++] = *cursor++;
+        value[out++] = *cursor++;
     }
 
     if (*cursor != '"') {
         return false;
     }
 
-    command[out] = '\0';
+    value[out] = '\0';
     return out > 0;
 }
 
@@ -344,6 +353,68 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
     }
 }
 
+static void publish_command_result(esp_mqtt_client_handle_t client,
+                                   const char *command_id,
+                                   const char *command,
+                                   const char *status,
+                                   const char *reason)
+{
+    if (client == NULL || !mqtt_connected) {
+        return;
+    }
+
+    char command_id_json[64];
+    char command_json[64];
+    char status_json[32];
+    char reason_json[96];
+
+    json_escape(command_id, command_id_json, sizeof(command_id_json));
+    json_escape(command, command_json, sizeof(command_json));
+    json_escape(status, status_json, sizeof(status_json));
+    json_escape(reason, reason_json, sizeof(reason_json));
+
+    const uint32_t revision = mqtt_runtime != NULL ? mqtt_runtime->system_status.revision : 0;
+    char payload[384];
+    const int payload_len = snprintf(
+        payload,
+        sizeof(payload),
+        "{\"schema\":\"hapanel.command_result.v1\","
+        "\"id\":\"%s\","
+        "\"command\":\"%s\","
+        "\"status\":\"%s\","
+        "\"reason\":\"%s\","
+        "\"revision\":%" PRIu32 ","
+        "\"uptime_ms\":%" PRIu64 "}",
+        command_id_json,
+        command_json,
+        status_json,
+        reason_json,
+        revision,
+        (uint64_t)(esp_timer_get_time() / 1000));
+
+    if (payload_len < 0 || payload_len >= (int)sizeof(payload)) {
+        ESP_LOGW(TAG, "MQTT command result payload truncated; skipping publish");
+        return;
+    }
+
+    const int msg_id = esp_mqtt_client_publish(client,
+                                               CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC,
+                                               payload,
+                                               payload_len,
+                                               0,
+                                               0);
+    if (msg_id < 0) {
+        ESP_LOGW(TAG, "Failed to publish MQTT command result");
+    } else {
+        ESP_LOGI(TAG,
+                 "Published MQTT command result: topic=%s command=%s status=%s msg_id=%d",
+                 CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC,
+                 command_json,
+                 status_json,
+                 msg_id);
+    }
+}
+
 static void status_change_callback(void *context)
 {
     (void)context;
@@ -371,11 +442,13 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
 {
     if (payload_len <= 0) {
         ESP_LOGW(TAG, "Ignoring empty MQTT command payload");
+        publish_command_result(client, "", "", "malformed", "empty payload");
         return;
     }
 
     if (payload_len >= 160) {
         ESP_LOGW(TAG, "Ignoring oversized MQTT command payload: len=%d", payload_len);
+        publish_command_result(client, "", "", "rejected", "payload too large");
         return;
     }
 
@@ -384,26 +457,33 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
     payload_buffer[payload_len] = '\0';
 
     char command[48];
+    char command_id[48] = "";
     if (payload_equals(payload_buffer, "status_refresh")) {
         strncpy(command, "status_refresh", sizeof(command));
         command[sizeof(command) - 1] = '\0';
-    } else if (!extract_command_field(payload_buffer, command, sizeof(command))) {
+    } else if (!extract_json_string_field(payload_buffer, "command", command, sizeof(command))) {
         ESP_LOGW(TAG, "Ignoring malformed MQTT command payload");
+        publish_command_result(client, "", "", "malformed", "missing or invalid command");
         return;
+    } else {
+        (void)extract_json_string_field(payload_buffer, "id", command_id, sizeof(command_id));
     }
 
     if (strcmp(command, "status_refresh") == 0) {
         ESP_LOGI(TAG, "MQTT command received: status_refresh");
         publish_device_status(client);
         publish_device_state(client, true);
+        publish_command_result(client, command_id, command, "accepted", "status refreshed");
     } else if (strcmp(command, "ui_refresh") == 0) {
         ESP_LOGI(TAG, "MQTT command received: ui_refresh");
         if (mqtt_runtime != NULL) {
             hapanel_runtime_request_refresh(mqtt_runtime);
         }
         publish_device_state(client, true);
+        publish_command_result(client, command_id, command, "accepted", "ui refresh requested");
     } else {
         ESP_LOGW(TAG, "Ignoring unknown MQTT command: %s", command);
+        publish_command_result(client, command_id, command, "rejected", "unknown command");
     }
 }
 
@@ -504,6 +584,7 @@ static void mqtt_event_handler(void *handler_args,
                          event->current_data_offset,
                          event->total_data_len,
                          event->data_len);
+                publish_command_result(event->client, "", "", "rejected", "fragmented payload");
                 break;
             }
             handle_command_payload(event->client, event->data, event->data_len);

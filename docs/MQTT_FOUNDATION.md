@@ -20,17 +20,20 @@ Current behavior:
   `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`
 - subscribes to `CONFIG_HAPANEL_MQTT_COMMAND_TOPIC` for safe foundation
   commands
+- publishes non-retained command result JSON to
+  `CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC`
 - supports `{"command":"status_refresh"}` to republish device status and state
 - supports `{"command":"ui_refresh"}` to re-render the current status UI from
   runtime state
+- supports an optional command `id` string for result correlation
 
 Current limitation:
 - no Home Assistant discovery or entity state topics are implemented yet
 - command handling is intentionally limited to low-risk foundation actions
 
-The next MQTT step is to add command acknowledgements or a command result topic
-so external controllers can distinguish accepted, rejected, and malformed
-commands. Add Home Assistant discovery only after the topic model is stable.
+The next MQTT step is to add a tiny external test script for the command/result
+round trip, then start shaping Home Assistant discovery only after the topic
+model is stable.
 
 ## Local Bring-Up
 
