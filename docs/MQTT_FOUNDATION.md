@@ -22,6 +22,8 @@ Current behavior:
   entities when `CONFIG_HAPANEL_MQTT_HA_DISCOVERY_ENABLE` is enabled
 - publishes retained Home Assistant MQTT discovery for diagnostic command
   buttons that use the existing safe command topic
+- publishes retained Home Assistant MQTT discovery for a last-command-result
+  diagnostic sensor backed by the command result topic
 - subscribes to `CONFIG_HAPANEL_MQTT_COMMAND_TOPIC` for safe foundation
   commands
 - publishes non-retained command result JSON to
@@ -50,6 +52,7 @@ homeassistant/sensor/hapanel_uptime/config
 homeassistant/sensor/hapanel_wifi_status/config
 homeassistant/sensor/hapanel_mqtt_status/config
 homeassistant/sensor/hapanel_ota_status/config
+homeassistant/sensor/hapanel_last_command_result/config
 homeassistant/binary_sensor/hapanel_psram_ready/config
 homeassistant/button/hapanel_status_refresh/config
 homeassistant/button/hapanel_ui_refresh/config
@@ -71,6 +74,10 @@ The discovered buttons publish non-retained command payloads to
 {"command":"status_refresh"}
 {"command":"ui_refresh"}
 ```
+
+The last-command-result sensor reads from
+`CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC`. That result topic is non-retained,
+so Home Assistant will show the latest result seen since the entity subscribed.
 
 ## Local Bring-Up
 
