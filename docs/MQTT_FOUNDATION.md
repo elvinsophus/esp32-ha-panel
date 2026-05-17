@@ -23,7 +23,7 @@ Current behavior:
 - publishes retained Home Assistant MQTT discovery for diagnostic command
   buttons that use the existing safe command topic
 - publishes retained Home Assistant MQTT discovery for a last-command-result
-  diagnostic sensor backed by the command result topic
+  diagnostic sensor backed by the retained command state topic
 - subscribes to `CONFIG_HAPANEL_MQTT_COMMAND_TOPIC` for safe foundation
   commands
 - publishes non-retained command result JSON to
@@ -34,6 +34,8 @@ Current behavior:
   and discovery
 - supports `{"command":"ui_refresh"}` to re-render the current status UI from
   runtime state
+- supports `{"command":"ota_preflight"}` to run the read-only OTA readiness
+  check and report the current running and target OTA slots
 - supports an optional command `id` string for result correlation
 
 Current limitation:
@@ -58,6 +60,7 @@ homeassistant/sensor/hapanel_last_command_result/config
 homeassistant/binary_sensor/hapanel_psram_ready/config
 homeassistant/button/hapanel_status_refresh/config
 homeassistant/button/hapanel_ui_refresh/config
+homeassistant/button/hapanel_ota_preflight/config
 ```
 
 The app-version entity reads from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`.
@@ -75,7 +78,12 @@ The discovered buttons publish non-retained command payloads to
 ```json
 {"command":"status_refresh"}
 {"command":"ui_refresh"}
+{"command":"ota_preflight"}
 ```
+
+`ota_preflight` does not write flash or reboot the panel. It only calls the OTA
+preflight gate, refreshes retained device state, and publishes the result to the
+command result/state topics.
 
 The last-command-result sensor reads from
 `CONFIG_HAPANEL_MQTT_COMMAND_STATE_TOPIC`. The event-style result topic remains
@@ -100,6 +108,7 @@ and wait for the matching command result:
 ```powershell
 .\tools\mqtt_command_test.ps1 -Command status_refresh
 .\tools\mqtt_command_test.ps1 -Command ui_refresh
+.\tools\mqtt_command_test.ps1 -Command ota_preflight
 .\tools\mqtt_command_test.ps1 -Command unknown_command -ExpectStatus rejected
 ```
 

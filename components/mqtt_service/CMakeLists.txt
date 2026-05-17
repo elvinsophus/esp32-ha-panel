@@ -8,6 +8,7 @@ idf_component_register(
         esp_event
         esp_timer
         esp_wifi
+        ota
         profile
         mqtt
         runtime)

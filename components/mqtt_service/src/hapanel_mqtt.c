@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "hapanel_ota.h"
 #include "hapanel_profile.h"
 #include "mqtt_client.h"
 
@@ -599,6 +600,22 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
             .topic = command_topic,
             .attributes_topic = state_topic,
         },
+        {
+            .component = "button",
+            .object_id = "hapanel_ota_preflight",
+            .payload_format =
+                "{\"name\":\"Check OTA Readiness\","
+                "\"unique_id\":\"%s_ota_preflight\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"ota_preflight\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = command_state_topic,
+        },
     };
 
     for (size_t i = 0; i < sizeof(entities) / sizeof(entities[0]); ++i) {
@@ -790,6 +807,35 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
         }
         publish_device_state(client, true);
         publish_command_result(client, command_id, command, "accepted", "ui refresh requested");
+    } else if (strcmp(command, "ota_preflight") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ota_preflight");
+        hapanel_ota_preflight_t preflight = {0};
+        esp_err_t preflight_result = hapanel_ota_preflight(&preflight);
+        publish_device_state(client, true);
+
+        char reason[96];
+        const int reason_len = snprintf(reason,
+                                        sizeof(reason),
+                                        "%s: running=%s target=%s size=%" PRIu32,
+                                        preflight.reason != NULL ? preflight.reason : "unknown",
+                                        preflight.running_label != NULL ? preflight.running_label
+                                                                        : "none",
+                                        preflight.target_label != NULL ? preflight.target_label
+                                                                       : "none",
+                                        preflight.target_size);
+        if (reason_len < 0 || reason_len >= (int)sizeof(reason)) {
+            strncpy(reason,
+                    preflight.allowed ? "ready" : "preflight blocked",
+                    sizeof(reason));
+            reason[sizeof(reason) - 1] = '\0';
+        }
+
+        publish_command_result(client,
+                               command_id,
+                               command,
+                               preflight_result == ESP_OK && preflight.allowed ? "accepted"
+                                                                               : "rejected",
+                               reason);
     } else {
         ESP_LOGW(TAG, "Ignoring unknown MQTT command: %s", command);
         publish_command_result(client, command_id, command, "rejected", "unknown command");
