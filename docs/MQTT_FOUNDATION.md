@@ -80,3 +80,16 @@ and wait for the matching command result:
 The script reads broker, credential, command topic, and result topic settings
 from `sdkconfig` and `sdkconfig.defaults.local`. It prints the JSON result
 payload and exits with an error if the expected result does not arrive.
+
+## Topic Dump
+
+Use `tools/mqtt_topic_dump.ps1` to inspect retained state or discovery topics:
+
+```powershell
+.\tools\mqtt_topic_dump.ps1 -Json
+.\tools\mqtt_topic_dump.ps1 -Topic homeassistant/sensor/hapanel_ota_status/config -Json
+```
+
+The script reads broker and credential settings from `sdkconfig` and
+`sdkconfig.defaults.local`. Without `-Topic`, it reads
+`CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`.
