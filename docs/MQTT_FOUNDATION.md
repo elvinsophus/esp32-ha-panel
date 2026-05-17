@@ -79,6 +79,10 @@ The last-command-result sensor reads from
 `CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC`. That result topic is non-retained,
 so Home Assistant will show the latest result seen since the entity subscribed.
 
+Firmware version values come from the ESP-IDF application descriptor. The root
+CMake project sets that descriptor to `0.1.0+<git-describe>` when Git metadata
+is available, with `-dirty` appended for uncommitted builds.
+
 ## Local Bring-Up
 
 Copy `sdkconfig.defaults.local.example` to `sdkconfig.defaults.local` and fill in
