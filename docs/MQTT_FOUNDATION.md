@@ -21,14 +21,16 @@ Current behavior:
 - subscribes to `CONFIG_HAPANEL_MQTT_COMMAND_TOPIC` for safe foundation
   commands
 - supports `{"command":"status_refresh"}` to republish device status and state
+- supports `{"command":"ui_refresh"}` to re-render the current status UI from
+  runtime state
 
 Current limitation:
 - no Home Assistant discovery or entity state topics are implemented yet
 - command handling is intentionally limited to low-risk foundation actions
 
-The next MQTT step is to introduce one small command that changes local panel
-state without affecting boot, storage, or OTA safety. Add Home Assistant
-discovery only after the topic model is stable.
+The next MQTT step is to add command acknowledgements or a command result topic
+so external controllers can distinguish accepted, rejected, and malformed
+commands. Add Home Assistant discovery only after the topic model is stable.
 
 ## Local Bring-Up
 

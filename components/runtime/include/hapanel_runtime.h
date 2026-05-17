@@ -30,5 +30,6 @@ void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
                                 hapanel_system_subsystem_t subsystem,
                                 const char *value,
                                 hapanel_system_level_t level);
+void hapanel_runtime_request_refresh(hapanel_runtime_t *runtime);
 void hapanel_runtime_render_root(hapanel_runtime_t *runtime);
 void hapanel_runtime_refresh_root(hapanel_runtime_t *runtime);

@@ -113,6 +113,19 @@ void hapanel_runtime_set_status_callback(hapanel_runtime_t *runtime,
     runtime->status_context = context;
 }
 
+void hapanel_runtime_request_refresh(hapanel_runtime_t *runtime)
+{
+    if (runtime == NULL || runtime->refresh_callback == NULL) {
+        return;
+    }
+
+    if (runtime->root_visible) {
+        runtime->rendered_revision = 0;
+    }
+
+    runtime->refresh_callback(runtime->refresh_context);
+}
+
 void hapanel_runtime_render_root(hapanel_runtime_t *runtime)
 {
     if (runtime == NULL) {

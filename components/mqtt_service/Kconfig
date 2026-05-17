@@ -55,6 +55,7 @@ menu "HAPanel MQTT"
         default "hapanel/device/command"
         help
             Non-retained command topic for safe foundation-level panel actions.
-            The initial supported command is {"command":"status_refresh"}.
+            Supported commands are {"command":"status_refresh"} and
+            {"command":"ui_refresh"}.
 
 endmenu

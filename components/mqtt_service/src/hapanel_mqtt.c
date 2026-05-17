@@ -396,6 +396,12 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
         ESP_LOGI(TAG, "MQTT command received: status_refresh");
         publish_device_status(client);
         publish_device_state(client, true);
+    } else if (strcmp(command, "ui_refresh") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ui_refresh");
+        if (mqtt_runtime != NULL) {
+            hapanel_runtime_request_refresh(mqtt_runtime);
+        }
+        publish_device_state(client, true);
     } else {
         ESP_LOGW(TAG, "Ignoring unknown MQTT command: %s", command);
     }
