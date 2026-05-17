@@ -34,8 +34,10 @@ typedef struct {
     hapanel_ota_partition_info_t ota_1;
     hapanel_ota_partition_info_t target;
     bool boot_matches_running;
+    bool reboot_required;
     bool rollback_enabled;
     const char *running_state;
+    const char *phase;
 } hapanel_ota_inventory_t;
 
 typedef struct {

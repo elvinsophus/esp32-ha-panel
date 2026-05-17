@@ -178,6 +178,7 @@ esp_err_t hapanel_ota_get_inventory(hapanel_ota_inventory_t *inventory)
         .rollback_enabled = false,
 #endif
         .running_state = "unavailable",
+        .phase = "unknown",
     };
 
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -203,6 +204,7 @@ esp_err_t hapanel_ota_get_inventory(hapanel_ota_inventory_t *inventory)
     copy_partition_info(&inventory->ota_1, ota_1);
     copy_partition_info(&inventory->target, target);
     inventory->boot_matches_running = running != NULL && boot != NULL && running == boot;
+    inventory->reboot_required = running != NULL && boot != NULL && running != boot;
 
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
     if (running != NULL) {
@@ -219,6 +221,20 @@ esp_err_t hapanel_ota_get_inventory(hapanel_ota_inventory_t *inventory)
 #else
     inventory->running_state = "rollback_disabled";
 #endif
+
+    if (running == NULL || boot == NULL) {
+        inventory->phase = "partition_error";
+    } else if (inventory->reboot_required) {
+        inventory->phase = "reboot_needed";
+    } else if (strcmp(inventory->running_state, "pending_verify") == 0 ||
+               strcmp(inventory->running_state, "new") == 0) {
+        inventory->phase = "pending_verify";
+    } else if (strcmp(inventory->running_state, "invalid") == 0 ||
+               strcmp(inventory->running_state, "aborted") == 0) {
+        inventory->phase = "invalid";
+    } else {
+        inventory->phase = "ready";
+    }
 
     return running != NULL && boot != NULL ? ESP_OK : ESP_ERR_NOT_FOUND;
 }

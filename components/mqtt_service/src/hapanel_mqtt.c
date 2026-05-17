@@ -321,6 +321,7 @@ static bool append_ota_state_object(char *buffer,
     char running_label[32];
     char target_label[32];
     char running_state[32];
+    char phase[32];
     json_escape(item->value, value, sizeof(value));
     json_escape(preflight.reason != NULL ? preflight.reason : "unknown", reason, sizeof(reason));
     json_escape(preflight.running_label != NULL ? preflight.running_label : "none",
@@ -332,6 +333,7 @@ static bool append_ota_state_object(char *buffer,
     json_escape(inventory.running_state != NULL ? inventory.running_state : "unknown",
                 running_state,
                 sizeof(running_state));
+    json_escape(inventory.phase != NULL ? inventory.phase : "unknown", phase, sizeof(phase));
 
     return append_text(buffer,
                        buffer_size,
@@ -340,8 +342,8 @@ static bool append_ota_state_object(char *buffer,
                        "\"preflight\":{\"allowed\":%s,\"reason\":\"%s\","
                        "\"running\":\"%s\",\"target\":\"%s\","
                        "\"target_address\":%" PRIu32 ",\"target_size\":%" PRIu32 "},"
-                       "\"inventory\":{\"boot_matches_running\":%s,\"rollback_enabled\":%s,"
-                       "\"running_state\":\"%s\","
+                       "\"inventory\":{\"boot_matches_running\":%s,\"reboot_required\":%s,"
+                       "\"rollback_enabled\":%s,\"running_state\":\"%s\",\"phase\":\"%s\","
                        "\"running\":{\"present\":%s,\"label\":\"%s\",\"address\":%" PRIu32
                        ",\"size\":%" PRIu32 "},"
                        "\"boot\":{\"present\":%s,\"label\":\"%s\",\"address\":%" PRIu32
@@ -361,8 +363,10 @@ static bool append_ota_state_object(char *buffer,
                        preflight.target_address,
                        preflight.target_size,
                        inventory.boot_matches_running ? "true" : "false",
+                       inventory.reboot_required ? "true" : "false",
                        inventory.rollback_enabled ? "true" : "false",
                        running_state,
+                       phase,
                        inventory.running.present ? "true" : "false",
                        inventory.running.label,
                        inventory.running.address,
@@ -627,6 +631,22 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"entity_category\":\"diagnostic\","
                 "\"state_topic\":\"%s\","
                 "\"value_template\":\"{{ value_json.ota.value }}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = state_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "sensor",
+            .object_id = "hapanel_ota_phase",
+            .payload_format =
+                "{\"name\":\"OTA Phase\","
+                "\"unique_id\":\"%s_ota_phase\","
+                "\"entity_category\":\"diagnostic\","
+                "\"state_topic\":\"%s\","
+                "\"value_template\":\"{{ value_json.ota.inventory.phase }}\","
                 "\"availability_topic\":\"%s\","
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","

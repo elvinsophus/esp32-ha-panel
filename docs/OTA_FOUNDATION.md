@@ -93,7 +93,12 @@ The preflight does not erase, write, download, or switch boot partitions.
 by MQTT diagnostics. It reports the running, boot, factory, `ota_0`, `ota_1`,
 and next target partitions, whether the configured boot partition matches the
 running partition, whether rollback is enabled, and the running OTA image state
-when ESP-IDF exposes it.
+when ESP-IDF exposes it. It also derives a normalized phase:
+- `ready`: no OTA action is pending
+- `reboot_needed`: a staged image is selected as the next boot target
+- `pending_verify`: the running image still needs rollback validation
+- `invalid`: ESP-IDF reports the running image invalid or aborted
+- `partition_error`: running or boot partition lookup failed
 
 ## Install Session
 

@@ -60,6 +60,7 @@ homeassistant/sensor/hapanel_uptime/config
 homeassistant/sensor/hapanel_wifi_status/config
 homeassistant/sensor/hapanel_mqtt_status/config
 homeassistant/sensor/hapanel_ota_status/config
+homeassistant/sensor/hapanel_ota_phase/config
 homeassistant/binary_sensor/hapanel_ota_ready/config
 homeassistant/sensor/hapanel_ota_running_slot/config
 homeassistant/sensor/hapanel_ota_target_slot/config
@@ -79,7 +80,9 @@ service-array ordering. The top-level `ota.preflight` object reports whether
 the OTA gate is open, its reason, the running slot, and the next target slot.
 The top-level `ota.inventory` object reports the running, boot, factory,
 `ota_0`, and `ota_1` partitions, boot/running agreement, rollback support, and
-running image state.
+running image state. It also reports a normalized `phase` and
+`reboot_required` flag so a staged image is visible without comparing partition
+objects manually.
 All discovered entities use
 `CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability and
 group under the HAPanel device in Home Assistant.
