@@ -17,7 +17,8 @@ Current behavior:
 - publishes retained structured device status JSON to
   `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`
 - publishes retained live device state JSON to
-  `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`
+  `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`, including read-only OTA preflight
+  details
 - publishes retained Home Assistant MQTT discovery for early diagnostic
   entities when `CONFIG_HAPANEL_MQTT_HA_DISCOVERY_ENABLE` is enabled
 - publishes retained Home Assistant MQTT discovery for diagnostic command
@@ -56,6 +57,9 @@ homeassistant/sensor/hapanel_uptime/config
 homeassistant/sensor/hapanel_wifi_status/config
 homeassistant/sensor/hapanel_mqtt_status/config
 homeassistant/sensor/hapanel_ota_status/config
+homeassistant/binary_sensor/hapanel_ota_ready/config
+homeassistant/sensor/hapanel_ota_running_slot/config
+homeassistant/sensor/hapanel_ota_target_slot/config
 homeassistant/sensor/hapanel_last_command_result/config
 homeassistant/binary_sensor/hapanel_psram_ready/config
 homeassistant/button/hapanel_status_refresh/config
@@ -64,10 +68,12 @@ homeassistant/button/hapanel_ota_preflight/config
 ```
 
 The app-version entity reads from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`.
-The uptime, Wi-Fi status, MQTT status, OTA status, and PSRAM readiness entities
-read from `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`. Wi-Fi, MQTT, and OTA are
-also exposed as top-level `wifi`, `mqtt`, and `ota` objects in the retained
-state payload so discovery templates do not depend on service-array ordering.
+The uptime, Wi-Fi status, MQTT status, OTA status, OTA readiness, OTA slot, and
+PSRAM readiness entities read from `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`.
+Wi-Fi, MQTT, and OTA are also exposed as top-level `wifi`, `mqtt`, and `ota`
+objects in the retained state payload so discovery templates do not depend on
+service-array ordering. The top-level `ota.preflight` object reports whether
+the OTA gate is open, its reason, the running slot, and the next target slot.
 All discovered entities use
 `CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability and
 group under the HAPanel device in Home Assistant.

@@ -302,6 +302,44 @@ static bool append_status_item_object(char *buffer,
                        system_level_name(item->level));
 }
 
+static bool append_ota_state_object(char *buffer,
+                                    size_t buffer_size,
+                                    size_t *offset,
+                                    const hapanel_system_status_item_t *item)
+{
+    hapanel_ota_preflight_t preflight = {0};
+    (void)hapanel_ota_preflight(&preflight);
+
+    char value[128];
+    char reason[96];
+    char running_label[32];
+    char target_label[32];
+    json_escape(item->value, value, sizeof(value));
+    json_escape(preflight.reason != NULL ? preflight.reason : "unknown", reason, sizeof(reason));
+    json_escape(preflight.running_label != NULL ? preflight.running_label : "none",
+                running_label,
+                sizeof(running_label));
+    json_escape(preflight.target_label != NULL ? preflight.target_label : "none",
+                target_label,
+                sizeof(target_label));
+
+    return append_text(buffer,
+                       buffer_size,
+                       offset,
+                       "\"ota\":{\"value\":\"%s\",\"level\":\"%s\","
+                       "\"preflight\":{\"allowed\":%s,\"reason\":\"%s\","
+                       "\"running\":\"%s\",\"target\":\"%s\","
+                       "\"target_address\":%" PRIu32 ",\"target_size\":%" PRIu32 "}},",
+                       value,
+                       system_level_name(item->level),
+                       preflight.allowed ? "true" : "false",
+                       reason,
+                       running_label,
+                       target_label,
+                       preflight.target_address,
+                       preflight.target_size);
+}
+
 static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
 {
     if (mqtt_runtime == NULL || client == NULL || !mqtt_connected) {
@@ -313,7 +351,7 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
         return;
     }
 
-    char payload[1536];
+    char payload[1792];
     size_t offset = 0;
     if (!append_text(payload,
                      sizeof(payload),
@@ -339,11 +377,10 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
                                    &offset,
                                    "mqtt",
                                    &status->items[HAPANEL_SYSTEM_MQTT]) ||
-        !append_status_item_object(payload,
-                                   sizeof(payload),
-                                   &offset,
-                                   "ota",
-                                   &status->items[HAPANEL_SYSTEM_OTA])) {
+        !append_ota_state_object(payload,
+                                 sizeof(payload),
+                                 &offset,
+                                 &status->items[HAPANEL_SYSTEM_OTA])) {
         ESP_LOGW(TAG, "MQTT device state connectivity payload truncated; skipping publish");
         return;
     }
@@ -545,6 +582,57 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"entity_category\":\"diagnostic\","
                 "\"state_topic\":\"%s\","
                 "\"value_template\":\"{{ value_json.ota.value }}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = state_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "binary_sensor",
+            .object_id = "hapanel_ota_ready",
+            .payload_format =
+                "{\"name\":\"OTA Ready\","
+                "\"unique_id\":\"%s_ota_ready\","
+                "\"entity_category\":\"diagnostic\","
+                "\"device_class\":\"connectivity\","
+                "\"state_topic\":\"%s\","
+                "\"value_template\":\"{{ 'ON' if value_json.ota.preflight.allowed else 'OFF' }}\","
+                "\"payload_on\":\"ON\","
+                "\"payload_off\":\"OFF\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = state_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "sensor",
+            .object_id = "hapanel_ota_running_slot",
+            .payload_format =
+                "{\"name\":\"OTA Running Slot\","
+                "\"unique_id\":\"%s_ota_running_slot\","
+                "\"entity_category\":\"diagnostic\","
+                "\"state_topic\":\"%s\","
+                "\"value_template\":\"{{ value_json.ota.preflight.running }}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = state_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "sensor",
+            .object_id = "hapanel_ota_target_slot",
+            .payload_format =
+                "{\"name\":\"OTA Target Slot\","
+                "\"unique_id\":\"%s_ota_target_slot\","
+                "\"entity_category\":\"diagnostic\","
+                "\"state_topic\":\"%s\","
+                "\"value_template\":\"{{ value_json.ota.preflight.target }}\","
                 "\"availability_topic\":\"%s\","
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","

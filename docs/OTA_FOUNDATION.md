@@ -11,6 +11,8 @@ Current behavior:
   initialization succeed
 - runs an OTA preflight check that selects the next update slot and blocks
   updates while the running image still needs validation
+- exposes the read-only OTA preflight result in retained MQTT device state and
+  Home Assistant diagnostic entities
 - exposes a transport-agnostic OTA install session API for begin, write,
   finish, and abort
 - exposes an opt-in local OTA self-test staging path that copies the running
