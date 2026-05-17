@@ -337,7 +337,12 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
                                    sizeof(payload),
                                    &offset,
                                    "mqtt",
-                                   &status->items[HAPANEL_SYSTEM_MQTT])) {
+                                   &status->items[HAPANEL_SYSTEM_MQTT]) ||
+        !append_status_item_object(payload,
+                                   sizeof(payload),
+                                   &offset,
+                                   "ota",
+                                   &status->items[HAPANEL_SYSTEM_OTA])) {
         ESP_LOGW(TAG, "MQTT device state connectivity payload truncated; skipping publish");
         return;
     }
@@ -508,6 +513,21 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"entity_category\":\"diagnostic\","
                 "\"state_topic\":\"%s\","
                 "\"value_template\":\"{{ value_json.mqtt.value }}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .state_topic = state_topic,
+        },
+        {
+            .component = "sensor",
+            .object_id = "hapanel_ota_status",
+            .payload_format =
+                "{\"name\":\"OTA Status\","
+                "\"unique_id\":\"%s_ota_status\","
+                "\"entity_category\":\"diagnostic\","
+                "\"state_topic\":\"%s\","
+                "\"value_template\":\"{{ value_json.ota.value }}\","
                 "\"availability_topic\":\"%s\","
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","

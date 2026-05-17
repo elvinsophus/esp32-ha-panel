@@ -47,14 +47,16 @@ homeassistant/sensor/hapanel_app_version/config
 homeassistant/sensor/hapanel_uptime/config
 homeassistant/sensor/hapanel_wifi_status/config
 homeassistant/sensor/hapanel_mqtt_status/config
+homeassistant/sensor/hapanel_ota_status/config
 homeassistant/binary_sensor/hapanel_psram_ready/config
 ```
 
 The app-version entity reads from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`.
-The uptime, Wi-Fi status, MQTT status, and PSRAM readiness entities read from
-`CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`. Wi-Fi and MQTT are also exposed as
-top-level `wifi` and `mqtt` objects in the retained state payload so discovery
-templates do not depend on service-array ordering. All discovered entities use
+The uptime, Wi-Fi status, MQTT status, OTA status, and PSRAM readiness entities
+read from `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`. Wi-Fi, MQTT, and OTA are
+also exposed as top-level `wifi`, `mqtt`, and `ota` objects in the retained
+state payload so discovery templates do not depend on service-array ordering.
+All discovered entities use
 `CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability and
 group under the HAPanel device in Home Assistant.
 
