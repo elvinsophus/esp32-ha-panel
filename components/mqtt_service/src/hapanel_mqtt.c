@@ -407,6 +407,7 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
     char state_topic[128];
     char command_topic[128];
     char command_result_topic[128];
+    char command_state_topic[128];
     char availability_topic[128];
 
     json_escape(app->version, app_version, sizeof(app_version));
@@ -418,6 +419,9 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
     json_escape(CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC,
                 command_result_topic,
                 sizeof(command_result_topic));
+    json_escape(CONFIG_HAPANEL_MQTT_COMMAND_STATE_TOPIC,
+                command_state_topic,
+                sizeof(command_state_topic));
     json_escape(CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC,
                 availability_topic,
                 sizeof(availability_topic));
@@ -560,8 +564,8 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"payload_available\":\"online\","
                 "\"payload_not_available\":\"offline\","
                 "\"json_attributes_topic\":\"%s\",%s}",
-            .topic = command_result_topic,
-            .attributes_topic = command_result_topic,
+            .topic = command_state_topic,
+            .attributes_topic = command_state_topic,
         },
         {
             .component = "button",
@@ -684,13 +688,13 @@ static void publish_command_result(esp_mqtt_client_handle_t client,
         return;
     }
 
-    const int msg_id = esp_mqtt_client_publish(client,
-                                               CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC,
-                                               payload,
-                                               payload_len,
-                                               0,
-                                               0);
-    if (msg_id < 0) {
+    const int result_msg_id = esp_mqtt_client_publish(client,
+                                                      CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC,
+                                                      payload,
+                                                      payload_len,
+                                                      0,
+                                                      0);
+    if (result_msg_id < 0) {
         ESP_LOGW(TAG, "Failed to publish MQTT command result");
     } else {
         ESP_LOGI(TAG,
@@ -698,7 +702,24 @@ static void publish_command_result(esp_mqtt_client_handle_t client,
                  CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC,
                  command_json,
                  status_json,
-                 msg_id);
+                 result_msg_id);
+    }
+
+    const int state_msg_id = esp_mqtt_client_publish(client,
+                                                     CONFIG_HAPANEL_MQTT_COMMAND_STATE_TOPIC,
+                                                     payload,
+                                                     payload_len,
+                                                     0,
+                                                     1);
+    if (state_msg_id < 0) {
+        ESP_LOGW(TAG, "Failed to publish MQTT command state");
+    } else {
+        ESP_LOGI(TAG,
+                 "Published MQTT command state: topic=%s command=%s status=%s msg_id=%d",
+                 CONFIG_HAPANEL_MQTT_COMMAND_STATE_TOPIC,
+                 command_json,
+                 status_json,
+                 state_msg_id);
     }
 }
 

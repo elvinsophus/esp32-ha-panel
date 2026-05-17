@@ -65,6 +65,13 @@ menu "HAPanel MQTT"
             Non-retained JSON topic used to report accepted, rejected, and
             malformed command payloads.
 
+    config HAPANEL_MQTT_COMMAND_STATE_TOPIC
+        string "MQTT command state topic"
+        default "hapanel/device/command/state"
+        help
+            Retained JSON topic with the latest command result for Home
+            Assistant diagnostics.
+
     config HAPANEL_MQTT_HA_DISCOVERY_ENABLE
         bool "Publish Home Assistant MQTT discovery"
         default y

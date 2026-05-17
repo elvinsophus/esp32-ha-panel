@@ -28,6 +28,8 @@ Current behavior:
   commands
 - publishes non-retained command result JSON to
   `CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC`
+- publishes retained latest command result JSON to
+  `CONFIG_HAPANEL_MQTT_COMMAND_STATE_TOPIC`
 - supports `{"command":"status_refresh"}` to republish device status, state,
   and discovery
 - supports `{"command":"ui_refresh"}` to re-render the current status UI from
@@ -76,8 +78,9 @@ The discovered buttons publish non-retained command payloads to
 ```
 
 The last-command-result sensor reads from
-`CONFIG_HAPANEL_MQTT_COMMAND_RESULT_TOPIC`. That result topic is non-retained,
-so Home Assistant will show the latest result seen since the entity subscribed.
+`CONFIG_HAPANEL_MQTT_COMMAND_STATE_TOPIC`. The event-style result topic remains
+non-retained for command round-trip listeners, while the state topic is retained
+so Home Assistant can recover the last command result after reconnecting.
 
 Firmware version values come from the ESP-IDF application descriptor. The root
 CMake project sets that descriptor to `0.1.0+<git-describe>` when Git metadata
