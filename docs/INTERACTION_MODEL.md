@@ -1,7 +1,16 @@
 # Interaction Model
 
 One-finger swipe:
-- layer navigation
+- Root -> Home Status: swipe right
+- Root -> Security: swipe up
+- Root -> Apps: swipe left
+- Home Status -> Root: swipe left
+- Security -> Root: swipe down
+- Apps -> Root: swipe right
+
+The current firmware implements this first spatial swipe set using LVGL gesture
+events. Status/quick-action gestures remain deferred so the top edge does not
+conflict with Root navigation.
 
 Two-finger pinch:
 - return to parent/root

@@ -285,6 +285,15 @@ static void request_page_event_cb(lv_event_t *event)
     page_request_callback((hapanel_ui_page_id_t)page_value, page_request_context);
 }
 
+static void request_page(hapanel_ui_page_id_t page)
+{
+    if (page_request_callback == NULL || page >= HAPANEL_UI_PAGE_COUNT || page == current_page) {
+        return;
+    }
+
+    page_request_callback(page, page_request_context);
+}
+
 static void make_page_target(lv_obj_t *obj, hapanel_ui_page_id_t page)
 {
     lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
@@ -293,6 +302,70 @@ static void make_page_target(lv_obj_t *obj, hapanel_ui_page_id_t page)
                         LV_EVENT_CLICKED,
                         (void *)(uintptr_t)page);
     lv_obj_set_style_bg_opa(obj, LV_OPA_80, LV_STATE_PRESSED);
+}
+
+static void gesture_event_cb(lv_event_t *event)
+{
+    if (lv_event_get_code(event) != LV_EVENT_GESTURE) {
+        return;
+    }
+
+    const lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
+    switch (current_page) {
+    case HAPANEL_UI_PAGE_ROOT:
+        if (dir == LV_DIR_RIGHT) {
+            request_page(HAPANEL_UI_PAGE_HOME);
+        } else if (dir == LV_DIR_TOP) {
+            request_page(HAPANEL_UI_PAGE_SECURITY);
+        } else if (dir == LV_DIR_LEFT) {
+            request_page(HAPANEL_UI_PAGE_APPS);
+        }
+        break;
+    case HAPANEL_UI_PAGE_HOME:
+        if (dir == LV_DIR_LEFT) {
+            request_page(HAPANEL_UI_PAGE_ROOT);
+        }
+        break;
+    case HAPANEL_UI_PAGE_SECURITY:
+        if (dir == LV_DIR_BOTTOM) {
+            request_page(HAPANEL_UI_PAGE_ROOT);
+        }
+        break;
+    case HAPANEL_UI_PAGE_APPS:
+        if (dir == LV_DIR_RIGHT) {
+            request_page(HAPANEL_UI_PAGE_ROOT);
+        }
+        break;
+    case HAPANEL_UI_PAGE_SYSTEM_STATUS:
+    default:
+        break;
+    }
+}
+
+static void add_gesture_bubble_recursive(lv_obj_t *obj)
+{
+    if (obj == NULL) {
+        return;
+    }
+
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    const uint32_t child_count = lv_obj_get_child_count(obj);
+    for (uint32_t i = 0; i < child_count; ++i) {
+        add_gesture_bubble_recursive(lv_obj_get_child(obj, i));
+    }
+}
+
+static void enable_page_gestures(lv_obj_t *root)
+{
+    if (root == NULL) {
+        return;
+    }
+
+    lv_obj_t *screen = lv_screen_active();
+    lv_obj_remove_event_cb(screen, gesture_event_cb);
+    lv_obj_add_event_cb(screen, gesture_event_cb, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(root, gesture_event_cb, LV_EVENT_GESTURE, NULL);
+    add_gesture_bubble_recursive(root);
 }
 
 static void configure_screen_root(lv_obj_t *root)
@@ -474,6 +547,7 @@ static void show_root_page(const hapanel_ui_status_t *status)
     make_page_target(apps_hint, HAPANEL_UI_PAGE_APPS);
 
     ambient_view.created = true;
+    enable_page_gestures(root);
     refresh_root_page(status);
 }
 
@@ -535,6 +609,7 @@ static void show_system_status_page(const hapanel_ui_status_t *status)
     lv_obj_set_width(footer, LV_PCT(100));
 
     root_view.created = true;
+    enable_page_gestures(root);
     refresh_system_status_page(status);
 }
 
@@ -606,6 +681,7 @@ static void show_home_page(const hapanel_ui_status_t *status)
     lv_obj_set_width(footer, LV_PCT(100));
 
     home_view.created = true;
+    enable_page_gestures(root);
     refresh_home_page(status);
 }
 
@@ -682,6 +758,7 @@ static void show_placeholder_page(const hapanel_ui_status_t *status,
     lv_obj_set_style_text_align(secondary_label, LV_TEXT_ALIGN_CENTER, 0);
 
     static_page_view.created = true;
+    enable_page_gestures(root);
     refresh_static_page(status);
 }
 

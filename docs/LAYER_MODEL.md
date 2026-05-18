@@ -39,3 +39,7 @@ The current page router is intentionally minimal. It gives future Home
 Assistant pages a stable navigation target. During bring-up, MQTT commands
 `ui_show_root`, `ui_show_home`, `ui_show_security`, `ui_show_apps`, and
 `ui_show_status` switch between the first pages.
+
+The Root page also supports one-finger spatial gestures: right to Home Status,
+up to Security, and left to Apps. The opposite gesture on each domain page
+returns to Root.
