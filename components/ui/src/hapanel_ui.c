@@ -35,9 +35,15 @@ typedef struct {
     lv_obj_t *entity_dots[HAPANEL_HOME_ENTITY_COUNT];
 } hapanel_home_view_t;
 
+typedef struct {
+    bool created;
+    lv_obj_t *psram_label;
+} hapanel_static_page_view_t;
+
 static hapanel_ambient_view_t ambient_view;
 static hapanel_root_view_t root_view;
 static hapanel_home_view_t home_view;
+static hapanel_static_page_view_t static_page_view;
 static const hapanel_home_state_t *home_state;
 static hapanel_ui_page_request_callback_t page_request_callback;
 static void *page_request_context;
@@ -48,6 +54,9 @@ static void show_system_status_page(const hapanel_ui_status_t *status);
 static void refresh_system_status_page(const hapanel_ui_status_t *status);
 static void show_home_page(const hapanel_ui_status_t *status);
 static void refresh_home_page(const hapanel_ui_status_t *status);
+static void show_security_page(const hapanel_ui_status_t *status);
+static void show_apps_page(const hapanel_ui_status_t *status);
+static void refresh_static_page(const hapanel_ui_status_t *status);
 
 static const hapanel_ui_page_descriptor_t page_descriptors[HAPANEL_UI_PAGE_COUNT] = {
     [HAPANEL_UI_PAGE_ROOT] = {
@@ -62,8 +71,18 @@ static const hapanel_ui_page_descriptor_t page_descriptors[HAPANEL_UI_PAGE_COUNT
     },
     [HAPANEL_UI_PAGE_HOME] = {
         .id = HAPANEL_UI_PAGE_HOME,
-        .layer = HAPANEL_UI_LAYER_ROOT,
+        .layer = HAPANEL_UI_LAYER_DOMAIN,
         .name = "Home Status",
+    },
+    [HAPANEL_UI_PAGE_SECURITY] = {
+        .id = HAPANEL_UI_PAGE_SECURITY,
+        .layer = HAPANEL_UI_LAYER_DOMAIN,
+        .name = "Security",
+    },
+    [HAPANEL_UI_PAGE_APPS] = {
+        .id = HAPANEL_UI_PAGE_APPS,
+        .layer = HAPANEL_UI_LAYER_DOMAIN,
+        .name = "Apps",
     },
 };
 
@@ -73,6 +92,14 @@ static hapanel_ui_layer_t current_layer = HAPANEL_UI_LAYER_ROOT;
 static const hapanel_profile_t *ui_profile(void)
 {
     return hapanel_profile_active();
+}
+
+static void reset_views(void)
+{
+    ambient_view = (hapanel_ambient_view_t){0};
+    root_view = (hapanel_root_view_t){0};
+    home_view = (hapanel_home_view_t){0};
+    static_page_view = (hapanel_static_page_view_t){0};
 }
 
 static lv_color_t color_for_status(hapanel_ui_status_level_t level)
@@ -440,10 +467,11 @@ static void show_root_page(const hapanel_ui_status_t *status)
 
     lv_obj_t *home_hint = create_pill_label(hints, "< Home", lv_color_hex(profile->theme.text_muted));
     make_page_target(home_hint, HAPANEL_UI_PAGE_HOME);
-    lv_obj_t *status_hint =
-        create_pill_label(hints, "Status", lv_color_hex(profile->theme.text_muted));
-    make_page_target(status_hint, HAPANEL_UI_PAGE_SYSTEM_STATUS);
-    create_pill_label(hints, "Apps >", lv_color_hex(profile->theme.text_muted));
+    lv_obj_t *security_hint =
+        create_pill_label(hints, "Security", lv_color_hex(profile->theme.text_muted));
+    make_page_target(security_hint, HAPANEL_UI_PAGE_SECURITY);
+    lv_obj_t *apps_hint = create_pill_label(hints, "Apps >", lv_color_hex(profile->theme.text_muted));
+    make_page_target(apps_hint, HAPANEL_UI_PAGE_APPS);
 
     ambient_view.created = true;
     refresh_root_page(status);
@@ -453,9 +481,7 @@ static void show_system_status_page(const hapanel_ui_status_t *status)
 {
     const hapanel_profile_t *profile = ui_profile();
 
-    ambient_view = (hapanel_ambient_view_t){0};
-    root_view = (hapanel_root_view_t){0};
-    home_view = (hapanel_home_view_t){0};
+    reset_views();
 
     lv_obj_t *screen = lv_screen_active();
     lv_obj_clean(screen);
@@ -516,9 +542,7 @@ static void show_home_page(const hapanel_ui_status_t *status)
 {
     const hapanel_profile_t *profile = ui_profile();
 
-    ambient_view = (hapanel_ambient_view_t){0};
-    root_view = (hapanel_root_view_t){0};
-    home_view = (hapanel_home_view_t){0};
+    reset_views();
 
     lv_obj_t *screen = lv_screen_active();
     lv_obj_clean(screen);
@@ -583,6 +607,102 @@ static void show_home_page(const hapanel_ui_status_t *status)
 
     home_view.created = true;
     refresh_home_page(status);
+}
+
+static void show_placeholder_page(const hapanel_ui_status_t *status,
+                                  const char *title,
+                                  const char *subtitle,
+                                  const char *primary,
+                                  const char *secondary,
+                                  uint32_t accent)
+{
+    const hapanel_profile_t *profile = ui_profile();
+
+    reset_views();
+
+    lv_obj_t *screen = lv_screen_active();
+    lv_obj_clean(screen);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(profile->theme.background), 0);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
+
+    lv_obj_t *root = lv_obj_create(screen);
+    configure_screen_root(root);
+
+    create_status_bar(root, status, &static_page_view.psram_label, NULL);
+
+    lv_obj_t *header = lv_obj_create(root);
+    lv_obj_remove_style_all(header);
+    lv_obj_set_width(header, LV_PCT(100));
+    lv_obj_set_height(header, 74);
+    lv_obj_set_layout(header, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t *copy = lv_obj_create(header);
+    lv_obj_remove_style_all(copy);
+    lv_obj_set_width(copy, 270);
+    configure_column(copy, 4);
+    create_label(copy, title, hapanel_ui_font_static_26(),
+                 lv_color_hex(profile->theme.text_primary));
+    lv_obj_t *subtitle_label =
+        create_label(copy, subtitle, hapanel_ui_font_static_12(),
+                     lv_color_hex(profile->theme.text_muted));
+    lv_label_set_long_mode(subtitle_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(subtitle_label, LV_PCT(100));
+
+    lv_obj_t *root_target =
+        create_pill_label(header, "Root", lv_color_hex(profile->theme.text_muted));
+    make_page_target(root_target, HAPANEL_UI_PAGE_ROOT);
+
+    lv_obj_t *body = lv_obj_create(root);
+    lv_obj_remove_style_all(body);
+    lv_obj_set_width(body, LV_PCT(100));
+    lv_obj_set_height(body, 292);
+    lv_obj_set_layout(body, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(body, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(body, profile->spacing.sm, 0);
+
+    lv_obj_t *dot = lv_obj_create(body);
+    lv_obj_remove_style_all(dot);
+    lv_obj_set_size(dot, 12, 12);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(dot, lv_color_hex(accent), 0);
+    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+
+    create_label(body, primary, hapanel_ui_font_static_18(),
+                 lv_color_hex(profile->theme.text_primary));
+    lv_obj_t *secondary_label =
+        create_label(body, secondary, hapanel_ui_font_static_12(),
+                     lv_color_hex(profile->theme.text_muted));
+    lv_label_set_long_mode(secondary_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(secondary_label, 320);
+    lv_obj_set_style_text_align(secondary_label, LV_TEXT_ALIGN_CENTER, 0);
+
+    static_page_view.created = true;
+    refresh_static_page(status);
+}
+
+static void show_security_page(const hapanel_ui_status_t *status)
+{
+    show_placeholder_page(status,
+                          "Security",
+                          "Sensors, alerts, and perimeter state will live here.",
+                          "No alerts",
+                          "Security entities are reserved for the next Home Assistant slice.",
+                          0xf0c674);
+}
+
+static void show_apps_page(const hapanel_ui_status_t *status)
+{
+    show_placeholder_page(status,
+                          "Apps",
+                          "Small panel utilities and optional tools will live here.",
+                          "No apps pinned",
+                          "App surfaces are scaffolded so Root has a stable right side.",
+                          0x9ccfd8);
 }
 
 static void refresh_root_page(const hapanel_ui_status_t *status)
@@ -707,6 +827,22 @@ static void refresh_home_page(const hapanel_ui_status_t *status)
 
 }
 
+static void refresh_static_page(const hapanel_ui_status_t *status)
+{
+    if (!static_page_view.created || status == NULL) {
+        return;
+    }
+
+    const hapanel_profile_t *profile = ui_profile();
+    if (static_page_view.psram_label != NULL) {
+        lv_label_set_text(static_page_view.psram_label, status->psram_ready ? "PSRAM" : "RAM");
+        lv_obj_set_style_text_color(static_page_view.psram_label,
+                                    status->psram_ready ? lv_color_hex(profile->theme.status_ok)
+                                                       : lv_color_hex(profile->theme.status_warning),
+                                    0);
+    }
+}
+
 const hapanel_ui_page_descriptor_t *hapanel_ui_page_descriptor(hapanel_ui_page_id_t page)
 {
     if (page >= HAPANEL_UI_PAGE_COUNT) {
@@ -750,6 +886,12 @@ void hapanel_ui_show_page(hapanel_ui_page_id_t page, const hapanel_ui_status_t *
     case HAPANEL_UI_PAGE_HOME:
         show_home_page(status);
         break;
+    case HAPANEL_UI_PAGE_SECURITY:
+        show_security_page(status);
+        break;
+    case HAPANEL_UI_PAGE_APPS:
+        show_apps_page(status);
+        break;
     case HAPANEL_UI_PAGE_SYSTEM_STATUS:
     default:
         show_system_status_page(status);
@@ -770,6 +912,10 @@ void hapanel_ui_refresh_current_page(const hapanel_ui_status_t *status)
         break;
     case HAPANEL_UI_PAGE_HOME:
         refresh_home_page(status);
+        break;
+    case HAPANEL_UI_PAGE_SECURITY:
+    case HAPANEL_UI_PAGE_APPS:
+        refresh_static_page(status);
         break;
     case HAPANEL_UI_PAGE_SYSTEM_STATUS:
     default:

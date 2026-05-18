@@ -994,6 +994,38 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
         },
         {
             .component = "button",
+            .object_id = "hapanel_ui_show_security",
+            .payload_format =
+                "{\"name\":\"Show Security Page\","
+                "\"unique_id\":\"%s_ui_show_security\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"ui_show_security\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "button",
+            .object_id = "hapanel_ui_show_apps",
+            .payload_format =
+                "{\"name\":\"Show Apps Page\","
+                "\"unique_id\":\"%s_ui_show_apps\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"ui_show_apps\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "button",
             .object_id = "hapanel_ota_preflight",
             .payload_format =
                 "{\"name\":\"Check OTA Readiness\","
@@ -1365,6 +1397,20 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
         }
         publish_device_state(client, true);
         publish_command_result(client, command_id, command, "accepted", "status page requested");
+    } else if (strcmp(command, "ui_show_security") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ui_show_security");
+        if (mqtt_runtime != NULL) {
+            hapanel_runtime_show_page(mqtt_runtime, HAPANEL_UI_PAGE_SECURITY);
+        }
+        publish_device_state(client, true);
+        publish_command_result(client, command_id, command, "accepted", "security page requested");
+    } else if (strcmp(command, "ui_show_apps") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ui_show_apps");
+        if (mqtt_runtime != NULL) {
+            hapanel_runtime_show_page(mqtt_runtime, HAPANEL_UI_PAGE_APPS);
+        }
+        publish_device_state(client, true);
+        publish_command_result(client, command_id, command, "accepted", "apps page requested");
     } else if (strcmp(command, "ota_preflight") == 0) {
         ESP_LOGI(TAG, "MQTT command received: ota_preflight");
         hapanel_ota_preflight_t preflight = {0};

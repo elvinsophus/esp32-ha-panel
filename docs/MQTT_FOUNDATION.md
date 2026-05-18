@@ -37,9 +37,9 @@ Current behavior:
   and discovery
 - supports `{"command":"ui_refresh"}` to re-render the current status UI from
   runtime state
-- supports `{"command":"ui_show_root"}`, `{"command":"ui_show_home"}`, and
-  `{"command":"ui_show_status"}` for
-  early page-router validation
+- supports `{"command":"ui_show_root"}`, `{"command":"ui_show_home"}`,
+  `{"command":"ui_show_status"}`, `{"command":"ui_show_security"}`, and
+  `{"command":"ui_show_apps"}` for early page-router validation
 - subscribes to three configurable Home page tile state topics:
   `CONFIG_HAPANEL_MQTT_HOME_SCENE_TOPIC`,
   `CONFIG_HAPANEL_MQTT_HOME_LIGHTS_TOPIC`, and
@@ -85,6 +85,8 @@ homeassistant/button/hapanel_status_refresh/config
 homeassistant/button/hapanel_ui_refresh/config
 homeassistant/button/hapanel_ui_show_home/config
 homeassistant/button/hapanel_ui_show_status/config
+homeassistant/button/hapanel_ui_show_security/config
+homeassistant/button/hapanel_ui_show_apps/config
 homeassistant/button/hapanel_ota_preflight/config
 homeassistant/button/hapanel_ota_reboot/config
 ```
@@ -119,6 +121,8 @@ The discovered buttons publish non-retained command payloads to
 {"command":"ui_show_root"}
 {"command":"ui_show_home"}
 {"command":"ui_show_status"}
+{"command":"ui_show_security"}
+{"command":"ui_show_apps"}
 {"command":"ota_preflight"}
 {"command":"ota_reboot"}
 ```

@@ -29,10 +29,13 @@ Current pages:
   assistant-presence scaffold
 - `HAPANEL_UI_PAGE_SYSTEM_STATUS`: root-layer boot/status surface backed by the
   existing service status UI
-- `HAPANEL_UI_PAGE_HOME`: root-layer Home Status surface scaffold with live
+- `HAPANEL_UI_PAGE_HOME`: domain-layer Home Status surface scaffold with live
   Home Assistant category tiles
+- `HAPANEL_UI_PAGE_SECURITY`: domain-layer placeholder for security sensors and
+  alerts
+- `HAPANEL_UI_PAGE_APPS`: domain-layer placeholder for optional panel utilities
 
 The current page router is intentionally minimal. It gives future Home
 Assistant pages a stable navigation target. During bring-up, MQTT commands
-`ui_show_root`, `ui_show_home`, and `ui_show_status` switch between the first
-root pages.
+`ui_show_root`, `ui_show_home`, `ui_show_security`, `ui_show_apps`, and
+`ui_show_status` switch between the first pages.
