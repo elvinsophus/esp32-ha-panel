@@ -63,7 +63,7 @@ static const hapanel_ui_page_descriptor_t page_descriptors[HAPANEL_UI_PAGE_COUNT
     [HAPANEL_UI_PAGE_HOME] = {
         .id = HAPANEL_UI_PAGE_HOME,
         .layer = HAPANEL_UI_LAYER_ROOT,
-        .name = "Home",
+        .name = "Home Status",
     },
 };
 
@@ -222,6 +222,28 @@ static lv_obj_t *create_panel(lv_obj_t *parent)
     return panel;
 }
 
+static lv_obj_t *create_pill_label(lv_obj_t *parent, const char *text, lv_color_t color)
+{
+    const hapanel_profile_t *profile = ui_profile();
+
+    lv_obj_t *pill = lv_obj_create(parent);
+    lv_obj_remove_style_all(pill);
+    lv_obj_set_height(pill, 32);
+    lv_obj_set_width(pill, 118);
+    lv_obj_set_style_pad_hor(pill, 14, 0);
+    lv_obj_set_style_radius(pill, 16, 0);
+    lv_obj_set_style_bg_color(pill, lv_color_hex(profile->theme.surface), 0);
+    lv_obj_set_style_bg_opa(pill, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(pill, 1, 0);
+    lv_obj_set_style_border_color(pill, lv_color_hex(profile->theme.surface_border), 0);
+    lv_obj_set_layout(pill, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(pill, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(pill, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    create_label(pill, text, hapanel_ui_font_static_12(), color);
+    return pill;
+}
+
 static void configure_screen_root(lv_obj_t *root)
 {
     const hapanel_profile_t *profile = ui_profile();
@@ -356,7 +378,7 @@ static void show_root_page(const hapanel_ui_status_t *status)
     lv_obj_t *hero = lv_obj_create(root);
     lv_obj_remove_style_all(hero);
     lv_obj_set_width(hero, LV_PCT(100));
-    lv_obj_set_height(hero, 170);
+    lv_obj_set_height(hero, 178);
     lv_obj_set_layout(hero, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(hero, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(hero, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
@@ -372,8 +394,7 @@ static void show_root_page(const hapanel_ui_status_t *status)
                                             clock_text,
                                             hapanel_ui_font_static_26(),
                                             lv_color_hex(profile->theme.text_primary));
-    lv_obj_set_style_text_font(ambient_view.clock_label, hapanel_ui_font_static_26(), 0);
-    lv_obj_set_style_transform_zoom(ambient_view.clock_label, 360, 0);
+    lv_obj_set_style_transform_zoom(ambient_view.clock_label, 300, 0);
 
     ambient_view.uptime_label = create_label(hero,
                                              uptime_text,
@@ -383,8 +404,8 @@ static void show_root_page(const hapanel_ui_status_t *status)
     lv_obj_t *assistant = lv_obj_create(root);
     lv_obj_remove_style_all(assistant);
     lv_obj_set_width(assistant, LV_PCT(100));
-    lv_obj_set_height(assistant, 132);
-    lv_obj_set_style_pad_all(assistant, profile->spacing.md, 0);
+    lv_obj_set_height(assistant, 124);
+    lv_obj_set_style_pad_all(assistant, profile->spacing.sm, 0);
     lv_obj_set_style_radius(assistant, profile->radius.md, 0);
     lv_obj_set_style_bg_color(assistant, lv_color_hex(profile->theme.surface), 0);
     lv_obj_set_style_bg_opa(assistant, LV_OPA_COVER, 0);
@@ -398,7 +419,7 @@ static void show_root_page(const hapanel_ui_status_t *status)
 
     lv_obj_t *eyes = lv_obj_create(assistant);
     lv_obj_remove_style_all(eyes);
-    lv_obj_set_size(eyes, 116, 34);
+    lv_obj_set_size(eyes, 128, 36);
     lv_obj_set_layout(eyes, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(eyes, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(eyes, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
@@ -407,30 +428,27 @@ static void show_root_page(const hapanel_ui_status_t *status)
     for (size_t i = 0; i < 2; ++i) {
         lv_obj_t *eye = lv_obj_create(eyes);
         lv_obj_remove_style_all(eye);
-        lv_obj_set_size(eye, 34, 34);
-        lv_obj_set_style_radius(eye, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_size(eye, 42, 18);
+        lv_obj_set_style_radius(eye, 9, 0);
         lv_obj_set_style_bg_color(eye, lv_color_hex(profile->theme.text_primary), 0);
-        lv_obj_set_style_bg_opa(eye, LV_OPA_80, 0);
+        lv_obj_set_style_bg_opa(eye, LV_OPA_70, 0);
     }
 
-    create_label(assistant, "Listening when needed", hapanel_ui_font_static_12(),
+    create_label(assistant, "Assistant idle", hapanel_ui_font_static_12(),
                  lv_color_hex(profile->theme.text_muted));
 
     lv_obj_t *hints = lv_obj_create(root);
     lv_obj_remove_style_all(hints);
     lv_obj_set_width(hints, LV_PCT(100));
-    lv_obj_set_height(hints, 54);
+    lv_obj_set_height(hints, 50);
     lv_obj_set_layout(hints, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(hints, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(hints, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
 
-    create_label(hints, "< Home", hapanel_ui_font_static_12(),
-                 lv_color_hex(profile->theme.text_muted));
-    create_label(hints, "Security", hapanel_ui_font_static_12(),
-                 lv_color_hex(profile->theme.text_muted));
-    create_label(hints, "Apps >", hapanel_ui_font_static_12(),
-                 lv_color_hex(profile->theme.text_muted));
+    create_pill_label(hints, "< Home", lv_color_hex(profile->theme.text_muted));
+    create_pill_label(hints, "Security", lv_color_hex(profile->theme.text_muted));
+    create_pill_label(hints, "Apps >", lv_color_hex(profile->theme.text_muted));
 
     ambient_view.created = true;
     refresh_root_page(status);
@@ -518,7 +536,7 @@ static void show_home_page(const hapanel_ui_status_t *status)
     lv_obj_set_flex_align(header, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(header, 2, 0);
 
-    create_label(header, "Home", hapanel_ui_font_static_26(),
+    create_label(header, "Home Status", hapanel_ui_font_static_26(),
                  lv_color_hex(profile->theme.text_primary));
 
     lv_obj_t *grid = lv_obj_create(root);

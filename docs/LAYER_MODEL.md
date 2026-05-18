@@ -29,8 +29,8 @@ Current pages:
   assistant-presence scaffold
 - `HAPANEL_UI_PAGE_SYSTEM_STATUS`: root-layer boot/status surface backed by the
   existing service status UI
-- `HAPANEL_UI_PAGE_HOME`: root-layer Home Assistant surface scaffold with static
-  tiles plus live foundation status tiles
+- `HAPANEL_UI_PAGE_HOME`: root-layer Home Status surface scaffold with static
+  Home Assistant tiles plus live foundation status tiles
 
 The current page router is intentionally minimal. It gives future Home
 Assistant pages a stable navigation target. During bring-up, MQTT commands
