@@ -198,6 +198,20 @@ void hapanel_runtime_show_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t 
     }
 }
 
+void hapanel_runtime_handle_ui_page_request(hapanel_runtime_t *runtime,
+                                            hapanel_ui_page_id_t page)
+{
+    if (runtime == NULL || page >= HAPANEL_UI_PAGE_COUNT) {
+        return;
+    }
+
+    hapanel_runtime_render_page(runtime, page);
+
+    if (runtime->status_callback != NULL) {
+        runtime->status_callback(runtime->status_context);
+    }
+}
+
 void hapanel_runtime_render_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page)
 {
     if (runtime == NULL) {

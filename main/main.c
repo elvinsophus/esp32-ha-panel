@@ -26,6 +26,12 @@ static void refresh_root_ui(void *context)
     }
 }
 
+static void handle_ui_page_request(hapanel_ui_page_id_t page, void *context)
+{
+    hapanel_runtime_t *runtime = (hapanel_runtime_t *)context;
+    hapanel_runtime_handle_ui_page_request(runtime, page);
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "Starting HAPanel firmware");
@@ -73,6 +79,7 @@ void app_main(void)
     }
 
     bsp_display_start();
+    hapanel_ui_set_page_request_callback(handle_ui_page_request, &runtime);
     hapanel_runtime_set_status(&runtime, HAPANEL_SYSTEM_DISPLAY, "Ready",
                                HAPANEL_SYSTEM_LEVEL_OK);
     hapanel_runtime_set_status(&runtime, HAPANEL_SYSTEM_TOUCH, "BSP online",

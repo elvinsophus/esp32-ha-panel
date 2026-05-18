@@ -50,6 +50,8 @@ void hapanel_runtime_set_home_entity(hapanel_runtime_t *runtime,
                                      bool online);
 void hapanel_runtime_request_refresh(hapanel_runtime_t *runtime);
 void hapanel_runtime_show_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page);
+void hapanel_runtime_handle_ui_page_request(hapanel_runtime_t *runtime,
+                                            hapanel_ui_page_id_t page);
 void hapanel_runtime_render_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page);
 void hapanel_runtime_refresh_current_page(hapanel_runtime_t *runtime);
 void hapanel_runtime_render_root(hapanel_runtime_t *runtime);
