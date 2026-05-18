@@ -827,6 +827,27 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                      msg_id);
         }
     }
+
+#if !CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE
+    char self_test_topic[160];
+    const int self_test_topic_len = snprintf(self_test_topic,
+                                             sizeof(self_test_topic),
+                                             "%s/button/hapanel_ota_self_test_stage/config",
+                                             CONFIG_HAPANEL_MQTT_HA_DISCOVERY_PREFIX);
+    if (self_test_topic_len < 0 || self_test_topic_len >= (int)sizeof(self_test_topic)) {
+        ESP_LOGW(TAG, "Home Assistant discovery cleanup topic truncated; skipping publish");
+    } else {
+        const int msg_id = esp_mqtt_client_publish(client, self_test_topic, "", 0, 0, 1);
+        if (msg_id < 0) {
+            ESP_LOGW(TAG, "Failed to clear Home Assistant discovery: topic=%s", self_test_topic);
+        } else {
+            ESP_LOGI(TAG,
+                     "Cleared Home Assistant discovery: topic=%s msg_id=%d",
+                     self_test_topic,
+                     msg_id);
+        }
+    }
+#endif
 #else
     (void)client;
 #endif
