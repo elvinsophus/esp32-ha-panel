@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
@@ -15,6 +16,8 @@ static const char *TAG = "hapanel_ota";
 
 enum {
     HAPANEL_OTA_COPY_CHUNK_SIZE = 4096,
+    HAPANEL_OTA_HTTP_CHUNK_SIZE = 4096,
+    HAPANEL_OTA_PROGRESS_STEP_PERCENT = 10,
 };
 
 static void log_partition(const char *role, const esp_partition_t *partition)
@@ -294,6 +297,7 @@ esp_err_t hapanel_ota_begin(hapanel_runtime_t *runtime,
         .runtime = runtime,
         .expected_size = image_size,
         .written_size = 0,
+        .last_progress_percent = 0,
     };
 
     ESP_LOGI(TAG,
@@ -330,6 +334,20 @@ esp_err_t hapanel_ota_write(hapanel_ota_session_t *session, const void *data, si
     }
 
     session->written_size += size;
+    if (session->expected_size > 0) {
+        uint8_t percent = (uint8_t)((session->written_size * 100U) / session->expected_size);
+        percent = (uint8_t)((percent / HAPANEL_OTA_PROGRESS_STEP_PERCENT) *
+                            HAPANEL_OTA_PROGRESS_STEP_PERCENT);
+        if (percent > 0 && percent < 100 && percent != session->last_progress_percent) {
+            char status[24];
+            const int status_len = snprintf(status, sizeof(status), "Writing %u%%", percent);
+            if (status_len > 0 && status_len < (int)sizeof(status)) {
+                set_ota_status(session->runtime, status, HAPANEL_SYSTEM_LEVEL_PENDING);
+            }
+            session->last_progress_percent = percent;
+        }
+    }
+
     return ESP_OK;
 }
 
@@ -384,6 +402,129 @@ esp_err_t hapanel_ota_abort(hapanel_ota_session_t *session)
     set_ota_status(session->runtime, "Aborted", HAPANEL_SYSTEM_LEVEL_WARNING);
     memset(session, 0, sizeof(*session));
     return abort_result;
+}
+
+esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const char *url)
+{
+    if (runtime == NULL || url == NULL || url[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (strncmp(url, "http://", strlen("http://")) != 0) {
+        ESP_LOGW(TAG, "Rejecting OTA URL without plain HTTP scheme");
+        set_ota_status(runtime, "Bad URL", HAPANEL_SYSTEM_LEVEL_WARNING);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_http_client_config_t config = {
+        .url = url,
+        .timeout_ms = 10000,
+        .buffer_size = HAPANEL_OTA_HTTP_CHUNK_SIZE,
+    };
+
+    set_ota_status(runtime, "Connecting", HAPANEL_SYSTEM_LEVEL_PENDING);
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client == NULL) {
+        set_ota_status(runtime, "HTTP failed", HAPANEL_SYSTEM_LEVEL_ERROR);
+        return ESP_FAIL;
+    }
+
+    esp_err_t result = esp_http_client_open(client, 0);
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open OTA URL: %s", esp_err_to_name(result));
+        set_ota_status(runtime, "HTTP failed", HAPANEL_SYSTEM_LEVEL_ERROR);
+        esp_http_client_cleanup(client);
+        return result;
+    }
+
+    int64_t content_length = esp_http_client_fetch_headers(client);
+    const int status_code = esp_http_client_get_status_code(client);
+    ESP_LOGI(TAG,
+             "OTA HTTP response: status=%d content_length=%" PRId64,
+             status_code,
+             content_length);
+
+    if (status_code < 200 || status_code >= 300) {
+        set_ota_status(runtime, "HTTP status", HAPANEL_SYSTEM_LEVEL_ERROR);
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+        return ESP_FAIL;
+    }
+
+    if (content_length <= 0 || content_length > SIZE_MAX) {
+        ESP_LOGE(TAG, "OTA HTTP response must include a known Content-Length");
+        set_ota_status(runtime, "Size unknown", HAPANEL_SYSTEM_LEVEL_ERROR);
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    hapanel_ota_session_t session = {0};
+    result = hapanel_ota_begin(runtime, &session, (size_t)content_length);
+    if (result != ESP_OK) {
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+        return result;
+    }
+
+    uint8_t *buffer = malloc(HAPANEL_OTA_HTTP_CHUNK_SIZE);
+    if (buffer == NULL) {
+        ESP_LOGE(TAG, "Unable to allocate OTA HTTP buffer");
+        (void)hapanel_ota_abort(&session);
+        set_ota_status(runtime, "No memory", HAPANEL_SYSTEM_LEVEL_ERROR);
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+        return ESP_ERR_NO_MEM;
+    }
+
+    while (session.written_size < session.expected_size) {
+        const size_t remaining = session.expected_size - session.written_size;
+        const int to_read = remaining < HAPANEL_OTA_HTTP_CHUNK_SIZE
+                                ? (int)remaining
+                                : HAPANEL_OTA_HTTP_CHUNK_SIZE;
+        const int read_size = esp_http_client_read(client, (char *)buffer, to_read);
+        if (read_size < 0) {
+            ESP_LOGE(TAG, "OTA HTTP read failed");
+            free(buffer);
+            (void)hapanel_ota_abort(&session);
+            set_ota_status(runtime, "Read failed", HAPANEL_SYSTEM_LEVEL_ERROR);
+            esp_http_client_close(client);
+            esp_http_client_cleanup(client);
+            return ESP_FAIL;
+        }
+
+        if (read_size == 0) {
+            ESP_LOGE(TAG,
+                     "OTA HTTP stream ended early: written=%zu expected=%zu",
+                     session.written_size,
+                     session.expected_size);
+            free(buffer);
+            (void)hapanel_ota_abort(&session);
+            set_ota_status(runtime, "Incomplete", HAPANEL_SYSTEM_LEVEL_ERROR);
+            esp_http_client_close(client);
+            esp_http_client_cleanup(client);
+            return ESP_ERR_INVALID_SIZE;
+        }
+
+        result = hapanel_ota_write(&session, buffer, (size_t)read_size);
+        if (result != ESP_OK) {
+            free(buffer);
+            (void)hapanel_ota_abort(&session);
+            esp_http_client_close(client);
+            esp_http_client_cleanup(client);
+            return result;
+        }
+    }
+
+    free(buffer);
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+
+    result = hapanel_ota_finish(&session);
+    if (result == ESP_OK) {
+        ESP_LOGI(TAG, "OTA HTTP image staged successfully; reboot is required");
+    }
+    return result;
 }
 
 static esp_err_t stage_running_image_for_self_test(hapanel_runtime_t *runtime, bool factory_only)

@@ -54,9 +54,12 @@ menu "HAPanel MQTT"
         string "MQTT command topic"
         default "hapanel/device/command"
         help
-            Non-retained command topic for safe foundation-level panel actions.
+            Non-retained command topic for foundation-level panel actions.
             Supported commands are {"command":"status_refresh"},
-            {"command":"ui_refresh"}, and {"command":"ota_preflight"}.
+            {"command":"ui_refresh"}, {"command":"ota_preflight"}, and
+            {"command":"ota_update","url":"http://.../hapanel.bin"}.
+            ota_update writes the inactive OTA slot and sets the next boot
+            target only after image validation; it never reboots automatically.
             Development builds may also enable {"command":"ota_self_test_stage"}.
 
     config HAPANEL_MQTT_COMMAND_RESULT_TOPIC

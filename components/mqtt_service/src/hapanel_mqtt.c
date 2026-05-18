@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "esp_app_desc.h"
@@ -11,6 +12,8 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "hapanel_ota.h"
 #include "hapanel_profile.h"
 #include "mqtt_client.h"
@@ -26,7 +29,13 @@ static esp_mqtt_client_handle_t mqtt_client;
 static bool event_handlers_registered;
 static bool mqtt_started;
 static bool mqtt_connected;
+static bool ota_update_task_running;
 static uint32_t published_state_revision;
+
+typedef struct {
+    char command_id[48];
+    char url[256];
+} ota_update_task_context_t;
 
 static bool topic_matches(const esp_mqtt_event_handle_t event, const char *topic)
 {
@@ -938,6 +947,30 @@ static void status_change_callback(void *context)
     publish_device_state(mqtt_client, false);
 }
 
+static void ota_update_task(void *context)
+{
+    ota_update_task_context_t *task_context = (ota_update_task_context_t *)context;
+    if (task_context == NULL) {
+        ota_update_task_running = false;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Starting MQTT-requested OTA update from URL");
+    esp_err_t update_result = hapanel_ota_install_from_http_url(mqtt_runtime, task_context->url);
+    publish_device_state(mqtt_client, true);
+    publish_command_result(mqtt_client,
+                           task_context->command_id,
+                           "ota_update",
+                           update_result == ESP_OK ? "accepted" : "rejected",
+                           update_result == ESP_OK ? "staged; reboot needed"
+                                                   : esp_err_to_name(update_result));
+
+    free(task_context);
+    ota_update_task_running = false;
+    vTaskDelete(NULL);
+}
+
 static void subscribe_command_topic(esp_mqtt_client_handle_t client)
 {
     const int msg_id = esp_mqtt_client_subscribe(client,
@@ -963,13 +996,13 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
         return;
     }
 
-    if (payload_len >= 160) {
+    if (payload_len >= 512) {
         ESP_LOGW(TAG, "Ignoring oversized MQTT command payload: len=%d", payload_len);
         publish_command_result(client, "", "", "rejected", "payload too large");
         return;
     }
 
-    char payload_buffer[160];
+    char payload_buffer[512];
     memcpy(payload_buffer, payload, payload_len);
     payload_buffer[payload_len] = '\0';
 
@@ -1052,6 +1085,48 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
                                stage_result == ESP_OK ? "accepted" : "rejected",
                                stage_result == ESP_OK ? "staged; reboot needed"
                                                       : esp_err_to_name(stage_result));
+    } else if (strcmp(command, "ota_update") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ota_update");
+        if (mqtt_runtime == NULL) {
+            publish_command_result(client, command_id, command, "rejected", "runtime unavailable");
+            return;
+        }
+
+        if (ota_update_task_running) {
+            publish_command_result(client, command_id, command, "rejected", "ota already running");
+            return;
+        }
+
+        char url[256];
+        if (!extract_json_string_field(payload_buffer, "url", url, sizeof(url))) {
+            publish_command_result(client, command_id, command, "malformed", "missing or invalid url");
+            return;
+        }
+
+        ota_update_task_context_t *task_context = calloc(1, sizeof(*task_context));
+        if (task_context == NULL) {
+            publish_command_result(client, command_id, command, "rejected", "no memory");
+            return;
+        }
+
+        snprintf(task_context->command_id, sizeof(task_context->command_id), "%s", command_id);
+        snprintf(task_context->url, sizeof(task_context->url), "%s", url);
+        ota_update_task_running = true;
+
+        BaseType_t task_result = xTaskCreate(ota_update_task,
+                                             "hapanel_ota_update",
+                                             8192,
+                                             task_context,
+                                             5,
+                                             NULL);
+        if (task_result != pdPASS) {
+            ota_update_task_running = false;
+            free(task_context);
+            publish_command_result(client, command_id, command, "rejected", "task create failed");
+            return;
+        }
+
+        publish_command_result(client, command_id, command, "accepted", "ota update started");
     } else {
         ESP_LOGW(TAG, "Ignoring unknown MQTT command: %s", command);
         publish_command_result(client, command_id, command, "rejected", "unknown command");

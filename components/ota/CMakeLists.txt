@@ -5,5 +5,6 @@ idf_component_register(
         include
     REQUIRES
         app_update
+        esp_http_client
         esp_partition
         runtime)

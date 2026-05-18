@@ -8,6 +8,7 @@ idf_component_register(
         esp_event
         esp_timer
         esp_wifi
+        freertos
         ota
         profile
         mqtt

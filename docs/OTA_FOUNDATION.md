@@ -15,16 +15,18 @@ Current behavior:
   MQTT device state and Home Assistant diagnostic entities
 - exposes a transport-agnostic OTA install session API for begin, write,
   finish, and abort
+- can install a firmware image from a plain HTTP URL with a known
+  `Content-Length`, using the same install session API
 - exposes an opt-in local OTA self-test staging path that copies the running
   image into the next OTA slot through the install session API
 - rejects MQTT-triggered OTA self-test staging unless
   `CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE` is explicitly enabled
 
 Current limitation:
-- update download and transport triggers are not implemented yet
+- HTTPS OTA is not enabled yet; the first transport is plain HTTP for local
+  controlled bring-up while certificate handling is designed
 
 Safety boundary:
-- no image download is implemented yet
 - no flash write happens during normal boot
 - no boot partition switch happens during normal boot
 - no partition layout change is made by the service itself
@@ -114,8 +116,24 @@ The session API:
 - switches the next boot partition only after validation succeeds
 - reports `Reboot needed` instead of restarting automatically
 
-No current boot path calls this session API. A future MQTT, HTTP, or local
-update trigger must call it explicitly.
+No current boot path calls this session API. MQTT, HTTP, or local update
+triggers must call it explicitly.
+
+## HTTP Install Transport
+
+`hapanel_ota_install_from_http_url()` downloads an application image from a
+plain `http://` URL with a known `Content-Length`. It:
+- rejects empty, non-HTTP, or unknown-size responses
+- rejects non-2xx HTTP status codes
+- writes through `hapanel_ota_begin()`, `hapanel_ota_write()`, and
+  `hapanel_ota_finish()`
+- reports coarse write progress in the OTA status text
+- stages the image for the next boot only after ESP-IDF validates it
+- never restarts the panel automatically
+
+This transport is intentionally narrow for the first real OTA milestone.
+HTTPS should be added once the project has an explicit CA/certificate storage
+strategy.
 
 ## Local Self-Test Staging
 

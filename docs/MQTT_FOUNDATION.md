@@ -37,6 +37,9 @@ Current behavior:
   runtime state
 - supports `{"command":"ota_preflight"}` to run the read-only OTA readiness
   check and report the current running and target OTA slots
+- supports `{"command":"ota_update","url":"http://.../hapanel.bin"}` to
+  download a firmware image over plain HTTP, write it to the inactive OTA slot,
+  validate it, and set it as the next boot target without rebooting
 - rejects `{"command":"ota_self_test_stage"}` unless
   `CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE` is explicitly enabled for a
   development build
@@ -45,7 +48,8 @@ Current behavior:
 Current limitation:
 - Home Assistant discovery currently covers only low-risk diagnostic entities;
   control entities and richer state sensors are still intentionally deferred
-- command handling is intentionally limited to low-risk foundation actions
+- OTA update command discovery is intentionally not published yet because it
+  needs a URL input and should remain an explicit admin action
 
 The next MQTT step is to expand discovery around existing retained topics before
 adding Home Assistant control commands.
@@ -100,6 +104,17 @@ The discovered buttons publish non-retained command payloads to
 preflight gate, refreshes retained device state, and publishes the result to the
 command result/state topics.
 
+`ota_update` is an explicit admin command:
+
+```json
+{"command":"ota_update","url":"http://192.168.42.22:8000/hapanel.bin"}
+```
+
+It requires a plain HTTP URL that returns a known `Content-Length`. The panel
+downloads the image on a worker task, writes only the inactive OTA slot, validates
+the image, sets the next boot partition, reports `Reboot needed`, and leaves the
+actual restart to a separate manual action.
+
 `ota_self_test_stage` is development-only. When enabled, it copies the running
 app image into the inactive OTA slot through the OTA install session and sets
 that slot as the next boot target. It writes flash and changes OTA boot
@@ -131,6 +146,13 @@ and wait for the matching command result:
 .\tools\mqtt_command_test.ps1 -Command ota_preflight
 .\tools\mqtt_command_test.ps1 -Command ota_self_test_stage -ExpectStatus rejected
 .\tools\mqtt_command_test.ps1 -Command unknown_command -ExpectStatus rejected
+```
+
+For OTA update testing, publish JSON directly until the helper grows arbitrary
+payload support:
+
+```json
+{"command":"ota_update","url":"http://192.168.42.22:8000/hapanel.bin"}
 ```
 
 The script reads broker, credential, command topic, and result topic settings
