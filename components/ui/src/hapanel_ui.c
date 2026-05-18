@@ -15,6 +15,20 @@ typedef struct {
 
 static hapanel_root_view_t root_view;
 
+static void show_system_status_page(const hapanel_ui_status_t *status);
+static void refresh_system_status_page(const hapanel_ui_status_t *status);
+
+static const hapanel_ui_page_descriptor_t page_descriptors[HAPANEL_UI_PAGE_COUNT] = {
+    [HAPANEL_UI_PAGE_SYSTEM_STATUS] = {
+        .id = HAPANEL_UI_PAGE_SYSTEM_STATUS,
+        .layer = HAPANEL_UI_LAYER_ROOT,
+        .name = "System Status",
+    },
+};
+
+static hapanel_ui_page_id_t current_page = HAPANEL_UI_PAGE_SYSTEM_STATUS;
+static hapanel_ui_layer_t current_layer = HAPANEL_UI_LAYER_ROOT;
+
 static const hapanel_profile_t *ui_profile(void)
 {
     return hapanel_profile_active();
@@ -156,7 +170,7 @@ static lv_obj_t *create_panel(lv_obj_t *parent)
     return panel;
 }
 
-void hapanel_ui_show_root(const hapanel_ui_status_t *status)
+static void show_system_status_page(const hapanel_ui_status_t *status)
 {
     const hapanel_profile_t *profile = ui_profile();
 
@@ -211,10 +225,10 @@ void hapanel_ui_show_root(const hapanel_ui_status_t *status)
     lv_obj_set_width(footer, LV_PCT(100));
 
     root_view.created = true;
-    hapanel_ui_refresh_root(status);
+    refresh_system_status_page(status);
 }
 
-void hapanel_ui_refresh_root(const hapanel_ui_status_t *status)
+static void refresh_system_status_page(const hapanel_ui_status_t *status)
 {
     if (!root_view.created || status == NULL) {
         return;
@@ -248,4 +262,61 @@ void hapanel_ui_refresh_root(const hapanel_ui_status_t *status)
                                       0);
         }
     }
+}
+
+const hapanel_ui_page_descriptor_t *hapanel_ui_page_descriptor(hapanel_ui_page_id_t page)
+{
+    if (page >= HAPANEL_UI_PAGE_COUNT) {
+        return NULL;
+    }
+
+    return &page_descriptors[page];
+}
+
+hapanel_ui_page_id_t hapanel_ui_current_page(void)
+{
+    return current_page;
+}
+
+hapanel_ui_layer_t hapanel_ui_current_layer(void)
+{
+    return current_layer;
+}
+
+void hapanel_ui_show_page(hapanel_ui_page_id_t page, const hapanel_ui_status_t *status)
+{
+    const hapanel_ui_page_descriptor_t *descriptor = hapanel_ui_page_descriptor(page);
+    if (descriptor == NULL) {
+        return;
+    }
+
+    current_page = descriptor->id;
+    current_layer = descriptor->layer;
+
+    switch (page) {
+    case HAPANEL_UI_PAGE_SYSTEM_STATUS:
+    default:
+        show_system_status_page(status);
+        break;
+    }
+}
+
+void hapanel_ui_refresh_current_page(const hapanel_ui_status_t *status)
+{
+    switch (current_page) {
+    case HAPANEL_UI_PAGE_SYSTEM_STATUS:
+    default:
+        refresh_system_status_page(status);
+        break;
+    }
+}
+
+void hapanel_ui_show_root(const hapanel_ui_status_t *status)
+{
+    hapanel_ui_show_page(HAPANEL_UI_PAGE_SYSTEM_STATUS, status);
+}
+
+void hapanel_ui_refresh_root(const hapanel_ui_status_t *status)
+{
+    hapanel_ui_refresh_current_page(status);
 }
