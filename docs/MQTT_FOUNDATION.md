@@ -40,6 +40,8 @@ Current behavior:
 - supports `{"command":"ota_update","url":"http://.../hapanel.bin"}` to
   download a firmware image over plain HTTP, write it to the inactive OTA slot,
   validate it, and set it as the next boot target without rebooting
+- supports `{"command":"ota_reboot"}` to reboot only when
+  `ota.inventory.reboot_required` is true
 - rejects `{"command":"ota_self_test_stage"}` unless
   `CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE` is explicitly enabled for a
   development build
@@ -73,6 +75,7 @@ homeassistant/binary_sensor/hapanel_psram_ready/config
 homeassistant/button/hapanel_status_refresh/config
 homeassistant/button/hapanel_ui_refresh/config
 homeassistant/button/hapanel_ota_preflight/config
+homeassistant/button/hapanel_ota_reboot/config
 ```
 
 The app-version entity reads from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`.
@@ -86,7 +89,9 @@ The top-level `ota.inventory` object reports the running, boot, factory,
 `ota_0`, and `ota_1` partitions, boot/running agreement, rollback support, and
 running image state. It also reports a normalized `phase` and
 `reboot_required` flag so a staged image is visible without comparing partition
-objects manually.
+objects manually. The top-level `ota.progress` object reports active OTA
+transport/write progress, including phase, target slot, byte counts, and
+percent complete.
 All discovered entities use
 `CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC` for online/offline availability and
 group under the HAPanel device in Home Assistant.
@@ -98,6 +103,7 @@ The discovered buttons publish non-retained command payloads to
 {"command":"status_refresh"}
 {"command":"ui_refresh"}
 {"command":"ota_preflight"}
+{"command":"ota_reboot"}
 ```
 
 `ota_preflight` does not write flash or reboot the panel. It only calls the OTA
@@ -114,6 +120,10 @@ It requires a plain HTTP URL that returns a known `Content-Length`. The panel
 downloads the image on a worker task, writes only the inactive OTA slot, validates
 the image, sets the next boot partition, reports `Reboot needed`, and leaves the
 actual restart to a separate manual action.
+
+`ota_reboot` is the guarded restart command for that separate manual action. It
+is rejected unless a staged OTA image is already selected as the next boot
+target.
 
 `ota_self_test_stage` is development-only. When enabled, it copies the running
 app image into the inactive OTA slot through the OTA install session and sets

@@ -10,6 +10,7 @@
 #include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -31,6 +32,10 @@ static bool mqtt_started;
 static bool mqtt_connected;
 static bool ota_update_task_running;
 static uint32_t published_state_revision;
+
+enum {
+    HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE = 3072,
+};
 
 typedef struct {
     char command_id[48];
@@ -324,6 +329,8 @@ static bool append_ota_state_object(char *buffer,
     (void)hapanel_ota_preflight(&preflight);
     hapanel_ota_inventory_t inventory = {0};
     (void)hapanel_ota_get_inventory(&inventory);
+    hapanel_ota_progress_t progress = {0};
+    (void)hapanel_ota_get_progress(&progress);
 
     char value[128];
     char reason[96];
@@ -331,6 +338,8 @@ static bool append_ota_state_object(char *buffer,
     char target_label[32];
     char running_state[32];
     char phase[32];
+    char progress_phase[32];
+    char progress_target[32];
     json_escape(item->value, value, sizeof(value));
     json_escape(preflight.reason != NULL ? preflight.reason : "unknown", reason, sizeof(reason));
     json_escape(preflight.running_label != NULL ? preflight.running_label : "none",
@@ -343,6 +352,12 @@ static bool append_ota_state_object(char *buffer,
                 running_state,
                 sizeof(running_state));
     json_escape(inventory.phase != NULL ? inventory.phase : "unknown", phase, sizeof(phase));
+    json_escape(progress.phase != NULL ? progress.phase : "unknown",
+                progress_phase,
+                sizeof(progress_phase));
+    json_escape(progress.target_label[0] != '\0' ? progress.target_label : "none",
+                progress_target,
+                sizeof(progress_target));
 
     return append_text(buffer,
                        buffer_size,
@@ -351,6 +366,8 @@ static bool append_ota_state_object(char *buffer,
                        "\"preflight\":{\"allowed\":%s,\"reason\":\"%s\","
                        "\"running\":\"%s\",\"target\":\"%s\","
                        "\"target_address\":%" PRIu32 ",\"target_size\":%" PRIu32 "},"
+                       "\"progress\":{\"active\":%s,\"phase\":\"%s\",\"target\":\"%s\","
+                       "\"written\":%zu,\"expected\":%zu,\"percent\":%u},"
                        "\"inventory\":{\"boot_matches_running\":%s,\"reboot_required\":%s,"
                        "\"rollback_enabled\":%s,\"running_state\":\"%s\",\"phase\":\"%s\","
                        "\"running\":{\"present\":%s,\"label\":\"%s\",\"address\":%" PRIu32
@@ -371,6 +388,12 @@ static bool append_ota_state_object(char *buffer,
                        target_label,
                        preflight.target_address,
                        preflight.target_size,
+                       progress.active ? "true" : "false",
+                       progress_phase,
+                       progress_target,
+                       progress.written_size,
+                       progress.expected_size,
+                       progress.percent,
                        inventory.boot_matches_running ? "true" : "false",
                        inventory.reboot_required ? "true" : "false",
                        inventory.rollback_enabled ? "true" : "false",
@@ -409,10 +432,15 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
         return;
     }
 
-    char payload[2304];
+    char *payload = malloc(HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE);
+    if (payload == NULL) {
+        ESP_LOGW(TAG, "Failed to allocate MQTT device state payload");
+        return;
+    }
+
     size_t offset = 0;
     if (!append_text(payload,
-                     sizeof(payload),
+                     HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE,
                      &offset,
                      "{\"schema\":\"hapanel.device_state.v1\","
                      "\"revision\":%" PRIu32 ","
@@ -422,30 +450,30 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
                      (uint64_t)(esp_timer_get_time() / 1000),
                      status->psram_ready ? "true" : "false")) {
         ESP_LOGW(TAG, "MQTT device state payload header truncated; skipping publish");
-        return;
+        goto cleanup;
     }
 
     if (!append_status_item_object(payload,
-                                   sizeof(payload),
+                                   HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE,
                                    &offset,
                                    "wifi",
                                    &status->items[HAPANEL_SYSTEM_WIFI]) ||
         !append_status_item_object(payload,
-                                   sizeof(payload),
+                                   HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE,
                                    &offset,
                                    "mqtt",
                                    &status->items[HAPANEL_SYSTEM_MQTT]) ||
         !append_ota_state_object(payload,
-                                 sizeof(payload),
+                                 HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE,
                                  &offset,
                                  &status->items[HAPANEL_SYSTEM_OTA])) {
         ESP_LOGW(TAG, "MQTT device state connectivity payload truncated; skipping publish");
-        return;
+        goto cleanup;
     }
 
-    if (!append_text(payload, sizeof(payload), &offset, "\"services\":[")) {
+    if (!append_text(payload, HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE, &offset, "\"services\":[")) {
         ESP_LOGW(TAG, "MQTT device state services header truncated; skipping publish");
-        return;
+        goto cleanup;
     }
 
     for (size_t i = 0; i < status->item_count; ++i) {
@@ -455,7 +483,7 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
         json_escape(status->items[i].value, value, sizeof(value));
 
         if (!append_text(payload,
-                         sizeof(payload),
+                         HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE,
                          &offset,
                          "%s{\"label\":\"%s\",\"value\":\"%s\",\"level\":\"%s\"}",
                          i == 0 ? "" : ",",
@@ -463,13 +491,13 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
                          value,
                          system_level_name(status->items[i].level))) {
             ESP_LOGW(TAG, "MQTT device state payload truncated; skipping publish");
-            return;
+            goto cleanup;
         }
     }
 
-    if (!append_text(payload, sizeof(payload), &offset, "]}")) {
+    if (!append_text(payload, HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE, &offset, "]}")) {
         ESP_LOGW(TAG, "MQTT device state payload footer truncated; skipping publish");
-        return;
+        goto cleanup;
     }
 
     const int msg_id = esp_mqtt_client_publish(client,
@@ -488,6 +516,9 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
                  status->revision,
                  msg_id);
     }
+
+cleanup:
+    free(payload);
 }
 
 static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
@@ -778,6 +809,22 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
             .topic = command_topic,
             .attributes_topic = command_state_topic,
         },
+        {
+            .component = "button",
+            .object_id = "hapanel_ota_reboot",
+            .payload_format =
+                "{\"name\":\"Reboot to Staged OTA\","
+                "\"unique_id\":\"%s_ota_reboot\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"ota_reboot\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = state_topic,
+        },
 #if CONFIG_HAPANEL_OTA_MQTT_SELF_TEST_STAGE_ENABLE
         {
             .component = "button",
@@ -971,6 +1018,14 @@ static void ota_update_task(void *context)
     vTaskDelete(NULL);
 }
 
+static void ota_reboot_task(void *context)
+{
+    (void)context;
+    vTaskDelay(pdMS_TO_TICKS(750));
+    ESP_LOGW(TAG, "Restarting to boot staged OTA image");
+    esp_restart();
+}
+
 static void subscribe_command_topic(esp_mqtt_client_handle_t client)
 {
     const int msg_id = esp_mqtt_client_subscribe(client,
@@ -1127,6 +1182,33 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
         }
 
         publish_command_result(client, command_id, command, "accepted", "ota update started");
+    } else if (strcmp(command, "ota_reboot") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ota_reboot");
+        hapanel_ota_inventory_t inventory = {0};
+        esp_err_t inventory_result = hapanel_ota_get_inventory(&inventory);
+        if (inventory_result != ESP_OK || !inventory.reboot_required) {
+            publish_device_state(client, true);
+            publish_command_result(client,
+                                   command_id,
+                                   command,
+                                   "rejected",
+                                   "no staged ota image");
+            return;
+        }
+
+        BaseType_t task_result = xTaskCreate(ota_reboot_task,
+                                             "hapanel_ota_reboot",
+                                             2048,
+                                             NULL,
+                                             5,
+                                             NULL);
+        if (task_result != pdPASS) {
+            publish_command_result(client, command_id, command, "rejected", "task create failed");
+            return;
+        }
+
+        publish_device_state(client, true);
+        publish_command_result(client, command_id, command, "accepted", "rebooting to staged ota");
     } else {
         ESP_LOGW(TAG, "Ignoring unknown MQTT command: %s", command);
         publish_command_result(client, command_id, command, "rejected", "unknown command");

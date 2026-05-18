@@ -13,6 +13,9 @@
 #include "sdkconfig.h"
 
 static const char *TAG = "hapanel_ota";
+static hapanel_ota_progress_t ota_progress = {
+    .phase = "idle",
+};
 
 enum {
     HAPANEL_OTA_COPY_CHUNK_SIZE = 4096,
@@ -66,6 +69,46 @@ static void set_ota_status(hapanel_runtime_t *runtime,
     }
 
     hapanel_runtime_set_status(runtime, HAPANEL_SYSTEM_OTA, value, level);
+}
+
+static void set_progress_phase(const char *phase, bool active)
+{
+    ota_progress.phase = phase != NULL ? phase : "unknown";
+    ota_progress.active = active;
+}
+
+static void reset_progress(void)
+{
+    ota_progress = (hapanel_ota_progress_t){
+        .active = false,
+        .phase = "idle",
+    };
+}
+
+static void update_progress_from_session(const hapanel_ota_session_t *session)
+{
+    if (session == NULL) {
+        return;
+    }
+
+    ota_progress.active = session->active;
+    ota_progress.written_size = session->written_size;
+    ota_progress.expected_size = session->expected_size;
+    ota_progress.percent = 0;
+    if (session->expected_size > 0) {
+        ota_progress.percent =
+            (uint8_t)((session->written_size * 100U) / session->expected_size);
+        if (ota_progress.percent > 100) {
+            ota_progress.percent = 100;
+        }
+    }
+
+    if (session->target != NULL) {
+        const size_t label_len = strnlen(session->target->label,
+                                         sizeof(ota_progress.target_label) - 1);
+        memcpy(ota_progress.target_label, session->target->label, label_len);
+        ota_progress.target_label[label_len] = '\0';
+    }
 }
 
 static const char *ota_state_name(esp_ota_img_states_t state)
@@ -242,6 +285,19 @@ esp_err_t hapanel_ota_get_inventory(hapanel_ota_inventory_t *inventory)
     return running != NULL && boot != NULL ? ESP_OK : ESP_ERR_NOT_FOUND;
 }
 
+esp_err_t hapanel_ota_get_progress(hapanel_ota_progress_t *progress)
+{
+    if (progress == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *progress = ota_progress;
+    if (progress->phase == NULL) {
+        progress->phase = "unknown";
+    }
+    return ESP_OK;
+}
+
 esp_err_t hapanel_ota_begin(hapanel_runtime_t *runtime,
                             hapanel_ota_session_t *session,
                             size_t image_size)
@@ -304,6 +360,8 @@ esp_err_t hapanel_ota_begin(hapanel_runtime_t *runtime,
              "OTA write session started: target=%s size=%zu",
              target->label,
              image_size);
+    set_progress_phase("writing", true);
+    update_progress_from_session(session);
     set_ota_status(runtime, "Receiving", HAPANEL_SYSTEM_LEVEL_PENDING);
     return ESP_OK;
 }
@@ -334,6 +392,7 @@ esp_err_t hapanel_ota_write(hapanel_ota_session_t *session, const void *data, si
     }
 
     session->written_size += size;
+    update_progress_from_session(session);
     if (session->expected_size > 0) {
         uint8_t percent = (uint8_t)((session->written_size * 100U) / session->expected_size);
         percent = (uint8_t)((percent / HAPANEL_OTA_PROGRESS_STEP_PERCENT) *
@@ -383,6 +442,8 @@ esp_err_t hapanel_ota_finish(hapanel_ota_session_t *session)
     }
 
     ESP_LOGI(TAG, "OTA image staged for next boot: target=%s", session->target->label);
+    update_progress_from_session(session);
+    set_progress_phase("staged", false);
     set_ota_status(session->runtime, "Reboot needed", HAPANEL_SYSTEM_LEVEL_OK);
     memset(session, 0, sizeof(*session));
     return ESP_OK;
@@ -400,6 +461,7 @@ esp_err_t hapanel_ota_abort(hapanel_ota_session_t *session)
     }
 
     set_ota_status(session->runtime, "Aborted", HAPANEL_SYSTEM_LEVEL_WARNING);
+    set_progress_phase("aborted", false);
     memset(session, 0, sizeof(*session));
     return abort_result;
 }
@@ -410,8 +472,12 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
         return ESP_ERR_INVALID_ARG;
     }
 
+    reset_progress();
+    set_progress_phase("connecting", true);
+
     if (strncmp(url, "http://", strlen("http://")) != 0) {
         ESP_LOGW(TAG, "Rejecting OTA URL without plain HTTP scheme");
+        set_progress_phase("rejected", false);
         set_ota_status(runtime, "Bad URL", HAPANEL_SYSTEM_LEVEL_WARNING);
         return ESP_ERR_INVALID_ARG;
     }
@@ -425,6 +491,7 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
     set_ota_status(runtime, "Connecting", HAPANEL_SYSTEM_LEVEL_PENDING);
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == NULL) {
+        set_progress_phase("error", false);
         set_ota_status(runtime, "HTTP failed", HAPANEL_SYSTEM_LEVEL_ERROR);
         return ESP_FAIL;
     }
@@ -432,6 +499,7 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
     esp_err_t result = esp_http_client_open(client, 0);
     if (result != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open OTA URL: %s", esp_err_to_name(result));
+        set_progress_phase("error", false);
         set_ota_status(runtime, "HTTP failed", HAPANEL_SYSTEM_LEVEL_ERROR);
         esp_http_client_cleanup(client);
         return result;
@@ -445,6 +513,7 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
              content_length);
 
     if (status_code < 200 || status_code >= 300) {
+        set_progress_phase("error", false);
         set_ota_status(runtime, "HTTP status", HAPANEL_SYSTEM_LEVEL_ERROR);
         esp_http_client_close(client);
         esp_http_client_cleanup(client);
@@ -453,6 +522,7 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
 
     if (content_length <= 0 || content_length > SIZE_MAX) {
         ESP_LOGE(TAG, "OTA HTTP response must include a known Content-Length");
+        set_progress_phase("error", false);
         set_ota_status(runtime, "Size unknown", HAPANEL_SYSTEM_LEVEL_ERROR);
         esp_http_client_close(client);
         esp_http_client_cleanup(client);
@@ -462,6 +532,7 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
     hapanel_ota_session_t session = {0};
     result = hapanel_ota_begin(runtime, &session, (size_t)content_length);
     if (result != ESP_OK) {
+        set_progress_phase("error", false);
         esp_http_client_close(client);
         esp_http_client_cleanup(client);
         return result;
@@ -471,6 +542,7 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
     if (buffer == NULL) {
         ESP_LOGE(TAG, "Unable to allocate OTA HTTP buffer");
         (void)hapanel_ota_abort(&session);
+        set_progress_phase("error", false);
         set_ota_status(runtime, "No memory", HAPANEL_SYSTEM_LEVEL_ERROR);
         esp_http_client_close(client);
         esp_http_client_cleanup(client);
@@ -487,6 +559,7 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
             ESP_LOGE(TAG, "OTA HTTP read failed");
             free(buffer);
             (void)hapanel_ota_abort(&session);
+            set_progress_phase("error", false);
             set_ota_status(runtime, "Read failed", HAPANEL_SYSTEM_LEVEL_ERROR);
             esp_http_client_close(client);
             esp_http_client_cleanup(client);
@@ -500,6 +573,7 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
                      session.expected_size);
             free(buffer);
             (void)hapanel_ota_abort(&session);
+            set_progress_phase("error", false);
             set_ota_status(runtime, "Incomplete", HAPANEL_SYSTEM_LEVEL_ERROR);
             esp_http_client_close(client);
             esp_http_client_cleanup(client);
@@ -510,6 +584,7 @@ esp_err_t hapanel_ota_install_from_http_url(hapanel_runtime_t *runtime, const ch
         if (result != ESP_OK) {
             free(buffer);
             (void)hapanel_ota_abort(&session);
+            set_progress_phase("error", false);
             esp_http_client_close(client);
             esp_http_client_cleanup(client);
             return result;
@@ -541,6 +616,7 @@ static esp_err_t stage_running_image_for_self_test(hapanel_runtime_t *runtime, b
         return ESP_ERR_NOT_SUPPORTED;
     }
 
+    reset_progress();
     hapanel_ota_session_t session = {0};
     esp_err_t begin_result = hapanel_ota_begin(runtime, &session, running->size);
     if (begin_result != ESP_OK) {

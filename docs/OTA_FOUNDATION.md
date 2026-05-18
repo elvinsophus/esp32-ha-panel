@@ -13,6 +13,7 @@ Current behavior:
   updates while the running image still needs validation
 - exposes the read-only OTA preflight result and partition inventory in retained
   MQTT device state and Home Assistant diagnostic entities
+- exposes structured OTA progress in retained MQTT device state
 - exposes a transport-agnostic OTA install session API for begin, write,
   finish, and abort
 - can install a firmware image from a plain HTTP URL with a known
@@ -128,8 +129,13 @@ plain `http://` URL with a known `Content-Length`. It:
 - writes through `hapanel_ota_begin()`, `hapanel_ota_write()`, and
   `hapanel_ota_finish()`
 - reports coarse write progress in the OTA status text
+- updates `ota.progress` in MQTT state with phase, target slot, byte counts,
+  and percent complete
 - stages the image for the next boot only after ESP-IDF validates it
 - never restarts the panel automatically
+
+The paired MQTT `ota_reboot` command is the guarded restart path. It is rejected
+unless `hapanel_ota_get_inventory()` reports `reboot_required=true`.
 
 This transport is intentionally narrow for the first real OTA milestone.
 HTTPS should be added once the project has an explicit CA/certificate storage

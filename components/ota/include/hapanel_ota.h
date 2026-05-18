@@ -42,6 +42,15 @@ typedef struct {
 
 typedef struct {
     bool active;
+    const char *phase;
+    char target_label[17];
+    size_t written_size;
+    size_t expected_size;
+    uint8_t percent;
+} hapanel_ota_progress_t;
+
+typedef struct {
+    bool active;
     esp_ota_handle_t handle;
     const esp_partition_t *target;
     hapanel_runtime_t *runtime;
@@ -54,6 +63,7 @@ esp_err_t hapanel_ota_init(hapanel_runtime_t *runtime);
 esp_err_t hapanel_ota_mark_boot_valid(hapanel_runtime_t *runtime);
 esp_err_t hapanel_ota_preflight(hapanel_ota_preflight_t *preflight);
 esp_err_t hapanel_ota_get_inventory(hapanel_ota_inventory_t *inventory);
+esp_err_t hapanel_ota_get_progress(hapanel_ota_progress_t *progress);
 esp_err_t hapanel_ota_begin(hapanel_runtime_t *runtime,
                             hapanel_ota_session_t *session,
                             size_t image_size);
