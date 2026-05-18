@@ -158,11 +158,12 @@ and wait for the matching command result:
 .\tools\mqtt_command_test.ps1 -Command unknown_command -ExpectStatus rejected
 ```
 
-For OTA update testing, publish JSON directly until the helper grows arbitrary
-payload support:
+For OTA update testing, use the helper's `-Payload` option when you need fields
+beyond the command name:
 
-```json
-{"command":"ota_update","url":"http://192.168.42.22:8000/hapanel.bin"}
+```powershell
+$payload = @{id="manual-ota-1"; command="ota_update"; url="http://192.168.42.22:8000/hapanel.bin"} | ConvertTo-Json -Compress
+.\tools\mqtt_command_test.ps1 -Id manual-ota-1 -Payload $payload -ExpectStatus accepted
 ```
 
 From a Windows development machine, `tools/serve_static_file.ps1` can serve the
@@ -172,9 +173,20 @@ built firmware with a fixed `Content-Length`:
 powershell -ExecutionPolicy Bypass -File .\tools\serve_static_file.ps1 -FilePath .\build\hapanel.bin -Port 8000
 ```
 
-The script reads broker, credential, command topic, and result topic settings
-from `sdkconfig` and `sdkconfig.defaults.local`. It prints the JSON result
-payload and exits with an error if the expected result does not arrive.
+To run the complete OTA loop from the development workstation, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\ota_roundtrip_test.ps1 -HostIp 192.168.42.40
+```
+
+The round-trip helper serves `build\hapanel.bin`, sends `ota_update`, waits for
+`ota.progress.phase=staged` and `ota.inventory.reboot_required=true`, sends the
+guarded `ota_reboot` command, and verifies that the panel comes back running
+from the staged slot. Pass `-NoReboot` to stop after staging.
+
+The MQTT helper scripts read broker, credential, command topic, and result topic
+settings from `sdkconfig` and `sdkconfig.defaults.local`. They print JSON result
+payloads and exit with an error if the expected result does not arrive.
 
 ## Topic Dump
 
