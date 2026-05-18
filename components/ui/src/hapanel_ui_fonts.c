@@ -7,8 +7,23 @@
 
 static const char *TAG = "hapanel_ui_fonts";
 
+LV_FONT_DECLARE(hapanel_font_dynamic_16);
+
+static bool dynamic_fonts_ready;
+static lv_font_t dynamic_font_16;
 static uint32_t logged_missing_codepoints[32];
 static bool missing_log_capacity_warned;
+
+static void ensure_dynamic_font_chain(void)
+{
+    if (dynamic_fonts_ready) {
+        return;
+    }
+
+    dynamic_font_16 = hapanel_font_dynamic_16;
+    dynamic_font_16.fallback = &lv_font_montserrat_16;
+    dynamic_fonts_ready = true;
+}
 
 static bool decode_utf8_next(const char *text, size_t *offset, uint32_t *codepoint)
 {
@@ -128,6 +143,12 @@ const lv_font_t *hapanel_ui_font_static_26(void)
 
 const lv_font_t *hapanel_ui_font_dynamic_16(void)
 {
+    ensure_dynamic_font_chain();
+    return &dynamic_font_16;
+}
+
+static const lv_font_t *hapanel_ui_font_safe_dynamic_16(void)
+{
     return &lv_font_montserrat_16;
 }
 
@@ -139,6 +160,21 @@ static void append_ascii(char *output, size_t output_size, size_t *offset, const
 
     while (*text != '\0' && *offset + 1 < output_size) {
         output[(*offset)++] = *text++;
+    }
+}
+
+static void append_text_bytes(char *output,
+                              size_t output_size,
+                              size_t *offset,
+                              const char *text,
+                              size_t byte_count)
+{
+    if (output_size == 0 || output == NULL || offset == NULL || text == NULL) {
+        return;
+    }
+
+    for (size_t i = 0; i < byte_count && *offset + 1 < output_size; ++i) {
+        output[(*offset)++] = text[i];
     }
 }
 
@@ -266,25 +302,41 @@ static const char *ascii_fallback_for_codepoint(uint32_t codepoint)
     }
 }
 
-void hapanel_ui_font_prepare_dynamic_text(const char *input, char *output, size_t output_size)
+const lv_font_t *hapanel_ui_font_prepare_dynamic_text(const char *input,
+                                                      char *output,
+                                                      size_t output_size)
 {
     if (output == NULL || output_size == 0) {
-        return;
+        return hapanel_ui_font_safe_dynamic_16();
     }
 
     output[0] = '\0';
     if (input == NULL) {
-        return;
+        return hapanel_ui_font_safe_dynamic_16();
     }
 
     size_t input_offset = 0;
     size_t output_offset = 0;
     uint32_t codepoint = 0;
-    while (decode_utf8_next(input, &input_offset, &codepoint) && output_offset + 1 < output_size) {
+    bool needs_extended_font = false;
+    const lv_font_t *extended_font = hapanel_ui_font_dynamic_16();
+    while (output_offset + 1 < output_size) {
+        const size_t codepoint_offset = input_offset;
+        if (!decode_utf8_next(input, &input_offset, &codepoint)) {
+            break;
+        }
+        const size_t codepoint_size = input_offset - codepoint_offset;
         if (codepoint >= 0x20 && codepoint <= 0x7e) {
             output[output_offset++] = (char)codepoint;
         } else if (codepoint == '\n' || codepoint == '\r' || codepoint == '\t') {
             output[output_offset++] = ' ';
+        } else if (font_chain_has_glyph(extended_font, codepoint)) {
+            append_text_bytes(output,
+                              output_size,
+                              &output_offset,
+                              &input[codepoint_offset],
+                              codepoint_size);
+            needs_extended_font = true;
         } else {
             append_ascii(output,
                          output_size,
@@ -293,6 +345,7 @@ void hapanel_ui_font_prepare_dynamic_text(const char *input, char *output, size_
         }
     }
     output[output_offset] = '\0';
+    return needs_extended_font ? extended_font : hapanel_ui_font_safe_dynamic_16();
 }
 
 void hapanel_ui_font_log_missing_glyphs(const char *surface, const char *text,
