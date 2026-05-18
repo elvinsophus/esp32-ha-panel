@@ -25,6 +25,8 @@ Layers are NOT equivalent to applications.
 The firmware now exposes a small page registry in `hapanel_ui_layer.h`.
 
 Current pages:
+- `HAPANEL_UI_PAGE_ROOT`: root spatial origin with a quiet ambient clock and
+  assistant-presence scaffold
 - `HAPANEL_UI_PAGE_SYSTEM_STATUS`: root-layer boot/status surface backed by the
   existing service status UI
 - `HAPANEL_UI_PAGE_HOME`: root-layer Home Assistant surface scaffold with static
@@ -32,4 +34,5 @@ Current pages:
 
 The current page router is intentionally minimal. It gives future Home
 Assistant pages a stable navigation target. During bring-up, MQTT commands
-`ui_show_home` and `ui_show_status` switch between the first two root pages.
+`ui_show_root`, `ui_show_home`, and `ui_show_status` switch between the first
+root pages.

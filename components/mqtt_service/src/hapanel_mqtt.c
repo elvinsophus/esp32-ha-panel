@@ -946,6 +946,22 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
         },
         {
             .component = "button",
+            .object_id = "hapanel_ui_show_root",
+            .payload_format =
+                "{\"name\":\"Show Root Page\","
+                "\"unique_id\":\"%s_ui_show_root\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"ui_show_root\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "button",
             .object_id = "hapanel_ui_show_home",
             .payload_format =
                 "{\"name\":\"Show Home Page\","
@@ -1328,6 +1344,13 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
         }
         publish_device_state(client, true);
         publish_command_result(client, command_id, command, "accepted", "ui refresh requested");
+    } else if (strcmp(command, "ui_show_root") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ui_show_root");
+        if (mqtt_runtime != NULL) {
+            hapanel_runtime_show_page(mqtt_runtime, HAPANEL_UI_PAGE_ROOT);
+        }
+        publish_device_state(client, true);
+        publish_command_result(client, command_id, command, "accepted", "root page requested");
     } else if (strcmp(command, "ui_show_home") == 0) {
         ESP_LOGI(TAG, "MQTT command received: ui_show_home");
         if (mqtt_runtime != NULL) {

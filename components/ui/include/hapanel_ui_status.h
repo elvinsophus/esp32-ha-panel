@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define HAPANEL_UI_STATUS_MAX_ITEMS 8
 
@@ -23,4 +24,5 @@ typedef struct {
     const hapanel_ui_status_item_t *items;
     size_t item_count;
     bool psram_ready;
+    uint64_t uptime_ms;
 } hapanel_ui_status_t;

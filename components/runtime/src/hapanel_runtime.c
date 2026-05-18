@@ -2,6 +2,8 @@
 
 #include "hapanel_ui.h"
 
+#include "esp_timer.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -54,6 +56,7 @@ static void sync_ui_snapshot(hapanel_runtime_t *runtime)
     runtime->ui_status.items = runtime->ui_items;
     runtime->ui_status.item_count = system_status->item_count;
     runtime->ui_status.psram_ready = system_status->psram_ready;
+    runtime->ui_status.uptime_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
     runtime->ui_home_state = runtime->home_state;
     runtime->ui_system_revision = system_status->revision;
     runtime->ui_home_revision = runtime->home_state.revision;
@@ -81,8 +84,8 @@ void hapanel_runtime_init(hapanel_runtime_t *runtime)
     runtime->lock = xSemaphoreCreateMutex();
     hapanel_system_status_init(&runtime->system_status);
     hapanel_home_state_init(&runtime->home_state);
-    runtime->requested_page = HAPANEL_UI_PAGE_SYSTEM_STATUS;
-    runtime->rendered_page = HAPANEL_UI_PAGE_SYSTEM_STATUS;
+    runtime->requested_page = HAPANEL_UI_PAGE_ROOT;
+    runtime->rendered_page = HAPANEL_UI_PAGE_ROOT;
     sync_ui_snapshot(runtime);
 }
 
@@ -240,7 +243,7 @@ void hapanel_runtime_refresh_current_page(hapanel_runtime_t *runtime)
 
 void hapanel_runtime_render_root(hapanel_runtime_t *runtime)
 {
-    hapanel_runtime_render_page(runtime, HAPANEL_UI_PAGE_SYSTEM_STATUS);
+    hapanel_runtime_render_page(runtime, HAPANEL_UI_PAGE_ROOT);
 }
 
 void hapanel_runtime_refresh_root(hapanel_runtime_t *runtime)

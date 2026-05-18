@@ -13,6 +13,7 @@ typedef enum {
 } hapanel_ui_layer_t;
 
 typedef enum {
+    HAPANEL_UI_PAGE_ROOT,
     HAPANEL_UI_PAGE_SYSTEM_STATUS,
     HAPANEL_UI_PAGE_HOME,
     HAPANEL_UI_PAGE_COUNT,

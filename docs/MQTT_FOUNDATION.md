@@ -37,7 +37,8 @@ Current behavior:
   and discovery
 - supports `{"command":"ui_refresh"}` to re-render the current status UI from
   runtime state
-- supports `{"command":"ui_show_home"}` and `{"command":"ui_show_status"}` for
+- supports `{"command":"ui_show_root"}`, `{"command":"ui_show_home"}`, and
+  `{"command":"ui_show_status"}` for
   early page-router validation
 - subscribes to three configurable Home page tile state topics:
   `CONFIG_HAPANEL_MQTT_HOME_SCENE_TOPIC`,
@@ -115,6 +116,7 @@ The discovered buttons publish non-retained command payloads to
 ```json
 {"command":"status_refresh"}
 {"command":"ui_refresh"}
+{"command":"ui_show_root"}
 {"command":"ui_show_home"}
 {"command":"ui_show_status"}
 {"command":"ota_preflight"}
