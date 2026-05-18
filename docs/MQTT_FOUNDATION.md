@@ -155,6 +155,13 @@ payload support:
 {"command":"ota_update","url":"http://192.168.42.22:8000/hapanel.bin"}
 ```
 
+From a Windows development machine, `tools/serve_static_file.ps1` can serve the
+built firmware with a fixed `Content-Length`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\serve_static_file.ps1 -FilePath .\build\hapanel.bin -Port 8000
+```
+
 The script reads broker, credential, command topic, and result topic settings
 from `sdkconfig` and `sdkconfig.defaults.local`. It prints the JSON result
 payload and exits with an error if the expected result does not arrive.
