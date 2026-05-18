@@ -19,6 +19,8 @@ Current behavior:
 - publishes retained live device state JSON to
   `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`, including read-only OTA preflight
   and partition inventory details
+- includes the requested/rendered UI page and current layer in retained device
+  state
 - publishes retained Home Assistant MQTT discovery for early diagnostic
   entities when `CONFIG_HAPANEL_MQTT_HA_DISCOVERY_ENABLE` is enabled
 - publishes retained Home Assistant MQTT discovery for diagnostic command
@@ -35,6 +37,8 @@ Current behavior:
   and discovery
 - supports `{"command":"ui_refresh"}` to re-render the current status UI from
   runtime state
+- supports `{"command":"ui_show_home"}` and `{"command":"ui_show_status"}` for
+  early page-router validation
 - supports `{"command":"ota_preflight"}` to run the read-only OTA readiness
   check and report the current running and target OTA slots
 - supports `{"command":"ota_update","url":"http://.../hapanel.bin"}` to
@@ -74,6 +78,8 @@ homeassistant/sensor/hapanel_last_command_result/config
 homeassistant/binary_sensor/hapanel_psram_ready/config
 homeassistant/button/hapanel_status_refresh/config
 homeassistant/button/hapanel_ui_refresh/config
+homeassistant/button/hapanel_ui_show_home/config
+homeassistant/button/hapanel_ui_show_status/config
 homeassistant/button/hapanel_ota_preflight/config
 homeassistant/button/hapanel_ota_reboot/config
 ```
@@ -81,6 +87,8 @@ homeassistant/button/hapanel_ota_reboot/config
 The app-version entity reads from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`.
 The uptime, Wi-Fi status, MQTT status, OTA status, OTA readiness, OTA slot, and
 PSRAM readiness entities read from `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`.
+The top-level `ui` object reports the requested page, rendered page, and layer
+for page-router bring-up.
 Wi-Fi, MQTT, and OTA are also exposed as top-level `wifi`, `mqtt`, and `ota`
 objects in the retained state payload so discovery templates do not depend on
 service-array ordering. The top-level `ota.preflight` object reports whether
@@ -102,6 +110,8 @@ The discovered buttons publish non-retained command payloads to
 ```json
 {"command":"status_refresh"}
 {"command":"ui_refresh"}
+{"command":"ui_show_home"}
+{"command":"ui_show_status"}
 {"command":"ota_preflight"}
 {"command":"ota_reboot"}
 ```

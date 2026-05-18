@@ -21,7 +21,7 @@ static void refresh_root_ui(void *context)
     hapanel_runtime_t *runtime = (hapanel_runtime_t *)context;
 
     if (bsp_display_lock(0)) {
-        hapanel_runtime_refresh_root(runtime);
+        hapanel_runtime_refresh_current_page(runtime);
         bsp_display_unlock();
     }
 }

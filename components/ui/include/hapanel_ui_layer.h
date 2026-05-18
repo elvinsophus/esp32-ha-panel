@@ -13,6 +13,7 @@ typedef enum {
 
 typedef enum {
     HAPANEL_UI_PAGE_SYSTEM_STATUS,
+    HAPANEL_UI_PAGE_HOME,
     HAPANEL_UI_PAGE_COUNT,
 } hapanel_ui_page_id_t;
 

@@ -283,6 +283,32 @@ static const char *system_level_name(hapanel_system_level_t level)
     }
 }
 
+static const char *ui_page_name(hapanel_ui_page_id_t page)
+{
+    const hapanel_ui_page_descriptor_t *descriptor = hapanel_ui_page_descriptor(page);
+    return descriptor != NULL && descriptor->name != NULL ? descriptor->name : "unknown";
+}
+
+static const char *ui_layer_name(hapanel_ui_layer_t layer)
+{
+    switch (layer) {
+    case HAPANEL_UI_LAYER_AMBIENT:
+        return "ambient";
+    case HAPANEL_UI_LAYER_ROOT:
+        return "root";
+    case HAPANEL_UI_LAYER_DOMAIN:
+        return "domain";
+    case HAPANEL_UI_LAYER_DETAIL:
+        return "detail";
+    case HAPANEL_UI_LAYER_OVERLAY:
+        return "overlay";
+    case HAPANEL_UI_LAYER_MODAL:
+        return "modal";
+    default:
+        return "unknown";
+    }
+}
+
 static bool append_text(char *buffer, size_t buffer_size, size_t *offset, const char *format, ...)
 {
     if (*offset >= buffer_size) {
@@ -318,6 +344,38 @@ static bool append_status_item_object(char *buffer,
                        field,
                        value,
                        system_level_name(item->level));
+}
+
+static bool append_ui_state_object(char *buffer,
+                                   size_t buffer_size,
+                                   size_t *offset,
+                                   const hapanel_runtime_t *runtime)
+{
+    if (runtime == NULL) {
+        return append_text(buffer,
+                           buffer_size,
+                           offset,
+                           "\"ui\":{\"requested\":\"unknown\",\"rendered\":\"unknown\","
+                           "\"layer\":\"unknown\"},");
+    }
+
+    char requested[32];
+    char rendered[32];
+    json_escape(ui_page_name(runtime->requested_page), requested, sizeof(requested));
+    json_escape(ui_page_name(runtime->rendered_page), rendered, sizeof(rendered));
+
+    const hapanel_ui_page_descriptor_t *descriptor =
+        hapanel_ui_page_descriptor(runtime->rendered_page);
+    const hapanel_ui_layer_t layer =
+        descriptor != NULL ? descriptor->layer : HAPANEL_UI_LAYER_ROOT;
+
+    return append_text(buffer,
+                       buffer_size,
+                       offset,
+                       "\"ui\":{\"requested\":\"%s\",\"rendered\":\"%s\",\"layer\":\"%s\"},",
+                       requested,
+                       rendered,
+                       ui_layer_name(layer));
 }
 
 static bool append_ota_state_object(char *buffer,
@@ -450,6 +508,14 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
                      (uint64_t)(esp_timer_get_time() / 1000),
                      status->psram_ready ? "true" : "false")) {
         ESP_LOGW(TAG, "MQTT device state payload header truncated; skipping publish");
+        goto cleanup;
+    }
+
+    if (!append_ui_state_object(payload,
+                                HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE,
+                                &offset,
+                                mqtt_runtime)) {
+        ESP_LOGW(TAG, "MQTT device state UI payload truncated; skipping publish");
         goto cleanup;
     }
 
@@ -795,6 +861,38 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
         },
         {
             .component = "button",
+            .object_id = "hapanel_ui_show_home",
+            .payload_format =
+                "{\"name\":\"Show Home Page\","
+                "\"unique_id\":\"%s_ui_show_home\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"ui_show_home\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "button",
+            .object_id = "hapanel_ui_show_status",
+            .payload_format =
+                "{\"name\":\"Show Status Page\","
+                "\"unique_id\":\"%s_ui_show_status\","
+                "\"entity_category\":\"diagnostic\","
+                "\"command_topic\":\"%s\","
+                "\"payload_press\":\"{\\\"command\\\":\\\"ui_show_status\\\"}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = command_topic,
+            .attributes_topic = state_topic,
+        },
+        {
+            .component = "button",
             .object_id = "hapanel_ota_preflight",
             .payload_format =
                 "{\"name\":\"Check OTA Readiness\","
@@ -1087,6 +1185,20 @@ static void handle_command_payload(esp_mqtt_client_handle_t client,
         }
         publish_device_state(client, true);
         publish_command_result(client, command_id, command, "accepted", "ui refresh requested");
+    } else if (strcmp(command, "ui_show_home") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ui_show_home");
+        if (mqtt_runtime != NULL) {
+            hapanel_runtime_show_page(mqtt_runtime, HAPANEL_UI_PAGE_HOME);
+        }
+        publish_device_state(client, true);
+        publish_command_result(client, command_id, command, "accepted", "home page requested");
+    } else if (strcmp(command, "ui_show_status") == 0) {
+        ESP_LOGI(TAG, "MQTT command received: ui_show_status");
+        if (mqtt_runtime != NULL) {
+            hapanel_runtime_show_page(mqtt_runtime, HAPANEL_UI_PAGE_SYSTEM_STATUS);
+        }
+        publish_device_state(client, true);
+        publish_command_result(client, command_id, command, "accepted", "status page requested");
     } else if (strcmp(command, "ota_preflight") == 0) {
         ESP_LOGI(TAG, "MQTT command received: ota_preflight");
         hapanel_ota_preflight_t preflight = {0};

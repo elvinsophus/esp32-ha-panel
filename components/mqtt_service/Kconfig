@@ -56,7 +56,8 @@ menu "HAPanel MQTT"
         help
             Non-retained command topic for foundation-level panel actions.
             Supported commands are {"command":"status_refresh"},
-            {"command":"ui_refresh"}, {"command":"ota_preflight"},
+            {"command":"ui_refresh"}, {"command":"ui_show_home"},
+            {"command":"ui_show_status"}, {"command":"ota_preflight"},
             {"command":"ota_update","url":"http://.../hapanel.bin"}, and
             {"command":"ota_reboot"}.
             ota_update writes the inactive OTA slot and sets the next boot

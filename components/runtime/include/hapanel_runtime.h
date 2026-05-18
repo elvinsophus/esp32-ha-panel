@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "hapanel_system_status.h"
+#include "hapanel_ui_layer.h"
 #include "hapanel_ui_status.h"
 
 typedef struct {
@@ -11,6 +12,8 @@ typedef struct {
     hapanel_ui_status_item_t ui_items[HAPANEL_SYSTEM_STATUS_COUNT];
     hapanel_ui_status_t ui_status;
     uint32_t rendered_revision;
+    hapanel_ui_page_id_t requested_page;
+    hapanel_ui_page_id_t rendered_page;
     bool root_visible;
     void (*refresh_callback)(void *context);
     void *refresh_context;
@@ -31,5 +34,8 @@ void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
                                 const char *value,
                                 hapanel_system_level_t level);
 void hapanel_runtime_request_refresh(hapanel_runtime_t *runtime);
+void hapanel_runtime_show_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page);
+void hapanel_runtime_render_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page);
+void hapanel_runtime_refresh_current_page(hapanel_runtime_t *runtime);
 void hapanel_runtime_render_root(hapanel_runtime_t *runtime);
 void hapanel_runtime_refresh_root(hapanel_runtime_t *runtime);

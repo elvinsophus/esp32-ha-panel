@@ -53,6 +53,8 @@ void hapanel_runtime_init(hapanel_runtime_t *runtime)
 
     *runtime = (hapanel_runtime_t){0};
     hapanel_system_status_init(&runtime->system_status);
+    runtime->requested_page = HAPANEL_UI_PAGE_SYSTEM_STATUS;
+    runtime->rendered_page = HAPANEL_UI_PAGE_SYSTEM_STATUS;
     sync_ui_status(runtime);
 }
 
@@ -126,26 +128,60 @@ void hapanel_runtime_request_refresh(hapanel_runtime_t *runtime)
     runtime->refresh_callback(runtime->refresh_context);
 }
 
-void hapanel_runtime_render_root(hapanel_runtime_t *runtime)
+void hapanel_runtime_show_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page)
+{
+    if (runtime == NULL || page >= HAPANEL_UI_PAGE_COUNT) {
+        return;
+    }
+
+    runtime->requested_page = page;
+    runtime->rendered_revision = 0;
+
+    if (runtime->refresh_callback != NULL) {
+        runtime->refresh_callback(runtime->refresh_context);
+    }
+}
+
+void hapanel_runtime_render_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page)
 {
     if (runtime == NULL) {
         return;
     }
 
     sync_ui_status(runtime);
-    hapanel_ui_show_root(&runtime->ui_status);
+    hapanel_ui_show_page(page, &runtime->ui_status);
+    runtime->requested_page = page;
+    runtime->rendered_page = page;
     runtime->rendered_revision = runtime->system_status.revision;
     runtime->root_visible = true;
 }
 
-void hapanel_runtime_refresh_root(hapanel_runtime_t *runtime)
+void hapanel_runtime_refresh_current_page(hapanel_runtime_t *runtime)
 {
-    if (runtime == NULL || !runtime->root_visible ||
-        runtime->rendered_revision == runtime->system_status.revision) {
+    if (runtime == NULL || !runtime->root_visible) {
+        return;
+    }
+
+    if (runtime->rendered_page != runtime->requested_page) {
+        hapanel_runtime_render_page(runtime, runtime->requested_page);
+        return;
+    }
+
+    if (runtime->rendered_revision == runtime->system_status.revision) {
         return;
     }
 
     sync_ui_status(runtime);
-    hapanel_ui_refresh_root(&runtime->ui_status);
+    hapanel_ui_refresh_current_page(&runtime->ui_status);
     runtime->rendered_revision = runtime->system_status.revision;
+}
+
+void hapanel_runtime_render_root(hapanel_runtime_t *runtime)
+{
+    hapanel_runtime_render_page(runtime, HAPANEL_UI_PAGE_SYSTEM_STATUS);
+}
+
+void hapanel_runtime_refresh_root(hapanel_runtime_t *runtime)
+{
+    hapanel_runtime_refresh_current_page(runtime);
 }
