@@ -256,13 +256,13 @@ static lv_obj_t *create_home_tile(lv_obj_t *parent,
     lv_obj_t *tile = lv_obj_create(parent);
     lv_obj_remove_style_all(tile);
     lv_obj_set_size(tile, 204, 100);
-    lv_obj_set_style_pad_all(tile, 14, 0);
+    lv_obj_set_style_pad_all(tile, 10, 0);
     lv_obj_set_style_radius(tile, profile->radius.sm, 0);
     lv_obj_set_style_bg_color(tile, lv_color_hex(profile->theme.surface), 0);
     lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(tile, 1, 0);
     lv_obj_set_style_border_color(tile, lv_color_hex(profile->theme.surface_border), 0);
-    configure_column(tile, 8);
+    configure_column(tile, 5);
 
     lv_obj_t *dot = lv_obj_create(tile);
     lv_obj_remove_style_all(dot);
@@ -277,8 +277,10 @@ static lv_obj_t *create_home_tile(lv_obj_t *parent,
     create_label(tile, label, hapanel_ui_font_static_12(), lv_color_hex(profile->theme.text_muted));
     lv_obj_t *value_obj = create_dynamic_label(tile, label, value,
                                                lv_color_hex(profile->theme.text_primary));
-    lv_label_set_long_mode(value_obj, LV_LABEL_LONG_DOT);
+    lv_label_set_long_mode(value_obj, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(value_obj, LV_PCT(100));
+    lv_obj_set_height(value_obj, 42);
+    lv_obj_set_style_text_line_space(value_obj, 2, 0);
 
     if (value_label != NULL) {
         *value_label = value_obj;
