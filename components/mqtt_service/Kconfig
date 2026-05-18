@@ -95,4 +95,24 @@ menu "HAPanel MQTT"
             MQTT discovery prefix configured in Home Assistant. The default is
             homeassistant.
 
+    config HAPANEL_MQTT_HOME_SCENE_TOPIC
+        string "Home page scene state topic"
+        default "hapanel/home/scene"
+        help
+            MQTT topic used to feed the Home page Scene tile. During bring-up,
+            point this at a retained Home Assistant state topic or publish a
+            simple text payload manually.
+
+    config HAPANEL_MQTT_HOME_LIGHTS_TOPIC
+        string "Home page lights state topic"
+        default "hapanel/home/lights"
+        help
+            MQTT topic used to feed the Home page Lights tile.
+
+    config HAPANEL_MQTT_HOME_CLIMATE_TOPIC
+        string "Home page climate state topic"
+        default "hapanel/home/climate"
+        help
+            MQTT topic used to feed the Home page Climate tile.
+
 endmenu

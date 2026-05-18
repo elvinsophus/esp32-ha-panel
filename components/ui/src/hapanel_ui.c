@@ -18,6 +18,8 @@ typedef struct {
 typedef struct {
     bool created;
     lv_obj_t *psram_label;
+    lv_obj_t *entity_values[HAPANEL_HOME_ENTITY_COUNT];
+    lv_obj_t *entity_dots[HAPANEL_HOME_ENTITY_COUNT];
     lv_obj_t *wifi_value;
     lv_obj_t *mqtt_value;
     lv_obj_t *ota_value;
@@ -25,6 +27,7 @@ typedef struct {
 
 static hapanel_root_view_t root_view;
 static hapanel_home_view_t home_view;
+static const hapanel_home_state_t *home_state;
 
 static void show_system_status_page(const hapanel_ui_status_t *status);
 static void refresh_system_status_page(const hapanel_ui_status_t *status);
@@ -245,6 +248,7 @@ static lv_obj_t *create_home_tile(lv_obj_t *parent,
                                   const char *label,
                                   const char *value,
                                   lv_color_t accent,
+                                  lv_obj_t **accent_dot,
                                   lv_obj_t **value_label)
 {
     const hapanel_profile_t *profile = ui_profile();
@@ -266,6 +270,9 @@ static lv_obj_t *create_home_tile(lv_obj_t *parent,
     lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(dot, accent, 0);
     lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+    if (accent_dot != NULL) {
+        *accent_dot = dot;
+    }
 
     create_label(tile, label, hapanel_ui_font_static_12(), lv_color_hex(profile->theme.text_muted));
     lv_obj_t *value_obj = create_dynamic_label(tile, label, value,
@@ -376,23 +383,40 @@ static void show_home_page(const hapanel_ui_status_t *status)
     lv_obj_set_style_pad_row(grid, profile->spacing.sm, 0);
     lv_obj_set_style_pad_column(grid, profile->spacing.sm, 0);
 
-    create_home_tile(grid, "Scene", "Evening", lv_color_hex(0x7ec8e3), NULL);
-    create_home_tile(grid, "Lights", "Ready", lv_color_hex(0xf0c674), NULL);
-    create_home_tile(grid, "Climate", "Comfort", lv_color_hex(0x9ccfd8), NULL);
+    const uint32_t entity_accents[HAPANEL_HOME_ENTITY_COUNT] = {
+        [HAPANEL_HOME_ENTITY_SCENE] = 0x7ec8e3,
+        [HAPANEL_HOME_ENTITY_LIGHTS] = 0xf0c674,
+        [HAPANEL_HOME_ENTITY_CLIMATE] = 0x9ccfd8,
+    };
+    for (size_t i = 0; i < HAPANEL_HOME_ENTITY_COUNT; ++i) {
+        const hapanel_home_entity_t *entity =
+            home_state != NULL ? &home_state->entities[i] : NULL;
+        create_home_tile(grid,
+                         entity != NULL ? entity->label : "Entity",
+                         entity != NULL ? entity->value : "Unknown",
+                         entity != NULL && entity->online
+                             ? lv_color_hex(entity_accents[i])
+                             : lv_color_hex(profile->theme.status_offline),
+                         &home_view.entity_dots[i],
+                         &home_view.entity_values[i]);
+    }
     create_home_tile(grid,
                      "Wi-Fi",
                      status_value_or(status, "Wi-Fi", "Offline"),
                      color_for_status(status_level_or(status, "Wi-Fi", HAPANEL_UI_STATUS_OFFLINE)),
+                     NULL,
                      &home_view.wifi_value);
     create_home_tile(grid,
                      "MQTT",
                      status_value_or(status, "MQTT", "Offline"),
                      color_for_status(status_level_or(status, "MQTT", HAPANEL_UI_STATUS_OFFLINE)),
+                     NULL,
                      &home_view.mqtt_value);
     create_home_tile(grid,
                      "OTA",
                      status_value_or(status, "OTA", "Unknown"),
                      color_for_status(status_level_or(status, "OTA", HAPANEL_UI_STATUS_OFFLINE)),
+                     NULL,
                      &home_view.ota_value);
 
     home_view.created = true;
@@ -448,6 +472,38 @@ static void refresh_home_page(const hapanel_ui_status_t *status)
                                     status->psram_ready ? lv_color_hex(profile->theme.status_ok)
                                                        : lv_color_hex(profile->theme.status_warning),
                                     0);
+    }
+
+    const uint32_t entity_accents[HAPANEL_HOME_ENTITY_COUNT] = {
+        [HAPANEL_HOME_ENTITY_SCENE] = 0x7ec8e3,
+        [HAPANEL_HOME_ENTITY_LIGHTS] = 0xf0c674,
+        [HAPANEL_HOME_ENTITY_CLIMATE] = 0x9ccfd8,
+    };
+    for (size_t i = 0; i < HAPANEL_HOME_ENTITY_COUNT; ++i) {
+        const hapanel_home_entity_t *entity =
+            home_state != NULL ? &home_state->entities[i] : NULL;
+        if (entity == NULL) {
+            continue;
+        }
+
+        if (home_view.entity_values[i] != NULL) {
+            hapanel_ui_font_log_missing_glyphs(entity->label,
+                                              entity->value,
+                                              hapanel_ui_font_dynamic_16());
+            lv_label_set_text(home_view.entity_values[i], entity->value);
+            lv_obj_set_style_text_color(home_view.entity_values[i],
+                                        entity->online
+                                            ? lv_color_hex(profile->theme.text_primary)
+                                            : lv_color_hex(profile->theme.text_muted),
+                                        0);
+        }
+
+        if (home_view.entity_dots[i] != NULL) {
+            lv_obj_set_style_bg_color(home_view.entity_dots[i],
+                                      entity->online ? lv_color_hex(entity_accents[i])
+                                                     : lv_color_hex(profile->theme.status_offline),
+                                      0);
+        }
     }
 
     if (home_view.wifi_value != NULL) {
@@ -522,6 +578,11 @@ void hapanel_ui_show_page(hapanel_ui_page_id_t page, const hapanel_ui_status_t *
         show_system_status_page(status);
         break;
     }
+}
+
+void hapanel_ui_set_home_state(const hapanel_home_state_t *state)
+{
+    home_state = state;
 }
 
 void hapanel_ui_refresh_current_page(const hapanel_ui_status_t *status)

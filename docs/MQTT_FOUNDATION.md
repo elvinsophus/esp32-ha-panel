@@ -39,6 +39,10 @@ Current behavior:
   runtime state
 - supports `{"command":"ui_show_home"}` and `{"command":"ui_show_status"}` for
   early page-router validation
+- subscribes to three configurable Home page tile state topics:
+  `CONFIG_HAPANEL_MQTT_HOME_SCENE_TOPIC`,
+  `CONFIG_HAPANEL_MQTT_HOME_LIGHTS_TOPIC`, and
+  `CONFIG_HAPANEL_MQTT_HOME_CLIMATE_TOPIC`
 - supports `{"command":"ota_preflight"}` to run the read-only OTA readiness
   check and report the current running and target OTA slots
 - supports `{"command":"ota_update","url":"http://.../hapanel.bin"}` to
@@ -88,7 +92,8 @@ The app-version entity reads from `CONFIG_HAPANEL_MQTT_DEVICE_STATUS_TOPIC`.
 The uptime, Wi-Fi status, MQTT status, OTA status, OTA readiness, OTA slot, and
 PSRAM readiness entities read from `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`.
 The top-level `ui` object reports the requested page, rendered page, and layer
-for page-router bring-up.
+for page-router bring-up. The top-level `home` object reports the current Home
+tile labels, values, online flags, and revisions.
 Wi-Fi, MQTT, and OTA are also exposed as top-level `wifi`, `mqtt`, and `ota`
 objects in the retained state payload so discovery templates do not depend on
 service-array ordering. The top-level `ota.preflight` object reports whether
@@ -210,3 +215,27 @@ Use `tools/mqtt_topic_dump.ps1` to inspect retained state or discovery topics:
 The script reads broker and credential settings from `sdkconfig` and
 `sdkconfig.defaults.local`. Without `-Topic`, it reads
 `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`.
+
+## Home Page Tile Topics
+
+The first Home page scaffold listens to simple text payloads on three
+configurable topics:
+
+```text
+CONFIG_HAPANEL_MQTT_HOME_SCENE_TOPIC    default hapanel/home/scene
+CONFIG_HAPANEL_MQTT_HOME_LIGHTS_TOPIC   default hapanel/home/lights
+CONFIG_HAPANEL_MQTT_HOME_CLIMATE_TOPIC  default hapanel/home/climate
+```
+
+Each payload is copied directly into the matching tile. Empty, `unknown`,
+`unavailable`, and `offline` mark the tile offline; any other text marks it
+online. This is intentionally small and works for retained Home Assistant MQTT
+state topics or manual bring-up publishes.
+
+Manual publish example:
+
+```powershell
+.\tools\mqtt_publish.ps1 -Topic hapanel/home/scene -Payload "Dinner" -Retain
+.\tools\mqtt_publish.ps1 -Topic hapanel/home/lights -Payload "Kitchen on" -Retain
+.\tools\mqtt_publish.ps1 -Topic hapanel/home/climate -Payload "22.5 C" -Retain
+```

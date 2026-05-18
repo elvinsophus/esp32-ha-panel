@@ -34,7 +34,7 @@ static bool ota_update_task_running;
 static uint32_t published_state_revision;
 
 enum {
-    HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE = 3072,
+    HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE = 4096,
 };
 
 typedef struct {
@@ -42,10 +42,46 @@ typedef struct {
     char url[256];
 } ota_update_task_context_t;
 
+typedef struct {
+    const char *topic;
+    hapanel_home_entity_id_t entity;
+} home_topic_subscription_t;
+
+static bool has_text(const char *value);
+
+static const home_topic_subscription_t HOME_TOPIC_SUBSCRIPTIONS[] = {
+    {
+        .topic = CONFIG_HAPANEL_MQTT_HOME_SCENE_TOPIC,
+        .entity = HAPANEL_HOME_ENTITY_SCENE,
+    },
+    {
+        .topic = CONFIG_HAPANEL_MQTT_HOME_LIGHTS_TOPIC,
+        .entity = HAPANEL_HOME_ENTITY_LIGHTS,
+    },
+    {
+        .topic = CONFIG_HAPANEL_MQTT_HOME_CLIMATE_TOPIC,
+        .entity = HAPANEL_HOME_ENTITY_CLIMATE,
+    },
+};
+
 static bool topic_matches(const esp_mqtt_event_handle_t event, const char *topic)
 {
     return event->topic_len == (int)strlen(topic) &&
            strncmp(event->topic, topic, event->topic_len) == 0;
+}
+
+static const home_topic_subscription_t *home_subscription_for_event(
+    const esp_mqtt_event_handle_t event)
+{
+    for (size_t i = 0; i < sizeof(HOME_TOPIC_SUBSCRIPTIONS) / sizeof(HOME_TOPIC_SUBSCRIPTIONS[0]);
+         ++i) {
+        if (has_text(HOME_TOPIC_SUBSCRIPTIONS[i].topic) &&
+            topic_matches(event, HOME_TOPIC_SUBSCRIPTIONS[i].topic)) {
+            return &HOME_TOPIC_SUBSCRIPTIONS[i];
+        }
+    }
+
+    return NULL;
 }
 
 static const char *skip_ascii_space(const char *value)
@@ -378,6 +414,47 @@ static bool append_ui_state_object(char *buffer,
                        ui_layer_name(layer));
 }
 
+static bool append_home_state_object(char *buffer,
+                                     size_t buffer_size,
+                                     size_t *offset,
+                                     const hapanel_runtime_t *runtime)
+{
+    if (runtime == NULL) {
+        return append_text(buffer, buffer_size, offset, "\"home\":{\"entities\":[]},");
+    }
+
+    if (!append_text(buffer,
+                     buffer_size,
+                     offset,
+                     "\"home\":{\"revision\":%" PRIu32 ",\"entities\":[",
+                     runtime->home_state.revision)) {
+        return false;
+    }
+
+    for (size_t i = 0; i < HAPANEL_HOME_ENTITY_COUNT; ++i) {
+        const hapanel_home_entity_t *entity = &runtime->home_state.entities[i];
+        char label[HAPANEL_HOME_ENTITY_LABEL_MAX * 2];
+        char value[HAPANEL_HOME_ENTITY_VALUE_MAX * 2];
+        json_escape(entity->label, label, sizeof(label));
+        json_escape(entity->value, value, sizeof(value));
+
+        if (!append_text(buffer,
+                         buffer_size,
+                         offset,
+                         "%s{\"label\":\"%s\",\"value\":\"%s\",\"online\":%s,"
+                         "\"revision\":%" PRIu32 "}",
+                         i == 0 ? "" : ",",
+                         label,
+                         value,
+                         entity->online ? "true" : "false",
+                         entity->revision)) {
+            return false;
+        }
+    }
+
+    return append_text(buffer, buffer_size, offset, "]},");
+}
+
 static bool append_ota_state_object(char *buffer,
                                     size_t buffer_size,
                                     size_t *offset,
@@ -516,6 +593,14 @@ static void publish_device_state(esp_mqtt_client_handle_t client, bool force)
                                 &offset,
                                 mqtt_runtime)) {
         ESP_LOGW(TAG, "MQTT device state UI payload truncated; skipping publish");
+        goto cleanup;
+    }
+
+    if (!append_home_state_object(payload,
+                                  HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE,
+                                  &offset,
+                                  mqtt_runtime)) {
+        ESP_LOGW(TAG, "MQTT device state home payload truncated; skipping publish");
         goto cleanup;
     }
 
@@ -1139,6 +1224,64 @@ static void subscribe_command_topic(esp_mqtt_client_handle_t client)
     }
 }
 
+static void subscribe_home_topics(esp_mqtt_client_handle_t client)
+{
+    for (size_t i = 0; i < sizeof(HOME_TOPIC_SUBSCRIPTIONS) / sizeof(HOME_TOPIC_SUBSCRIPTIONS[0]);
+         ++i) {
+        const char *topic = HOME_TOPIC_SUBSCRIPTIONS[i].topic;
+        if (!has_text(topic)) {
+            continue;
+        }
+
+        const int msg_id = esp_mqtt_client_subscribe(client, topic, 0);
+        if (msg_id < 0) {
+            ESP_LOGW(TAG, "Failed to subscribe Home tile topic: %s", topic);
+        } else {
+            ESP_LOGI(TAG, "Subscribed Home tile topic: topic=%s msg_id=%d", topic, msg_id);
+        }
+    }
+}
+
+static void trim_payload_text(char *value)
+{
+    if (value == NULL) {
+        return;
+    }
+
+    char *start = (char *)skip_ascii_space(value);
+    if (start != value) {
+        memmove(value, start, strlen(start) + 1);
+    }
+
+    size_t len = strlen(value);
+    while (len > 0 && is_ascii_space(value[len - 1])) {
+        value[--len] = '\0';
+    }
+}
+
+static void handle_home_topic_payload(esp_mqtt_client_handle_t client,
+                                      const home_topic_subscription_t *subscription,
+                                      const char *payload,
+                                      int payload_len)
+{
+    if (mqtt_runtime == NULL || subscription == NULL || payload_len < 0) {
+        return;
+    }
+
+    char value[HAPANEL_HOME_ENTITY_VALUE_MAX];
+    const size_t copy_len = payload_len < (int)(sizeof(value) - 1)
+                                ? (size_t)payload_len
+                                : sizeof(value) - 1;
+    memcpy(value, payload, copy_len);
+    value[copy_len] = '\0';
+    trim_payload_text(value);
+
+    const bool online = value[0] != '\0' && strcmp(value, "unavailable") != 0 &&
+                        strcmp(value, "unknown") != 0 && strcmp(value, "offline") != 0;
+    hapanel_runtime_set_home_entity(mqtt_runtime, subscription->entity, value, online);
+    publish_device_state(client, true);
+}
+
 static void handle_command_payload(esp_mqtt_client_handle_t client,
                                    const char *payload,
                                    int payload_len)
@@ -1403,6 +1546,7 @@ static void mqtt_event_handler(void *handler_args,
                                 0,
                                 1);
         subscribe_command_topic(event->client);
+        subscribe_home_topics(event->client);
         publish_device_status(event->client);
         publish_device_state(event->client, true);
         publish_home_assistant_discovery(event->client);
@@ -1430,10 +1574,26 @@ static void mqtt_event_handler(void *handler_args,
             }
             handle_command_payload(event->client, event->data, event->data_len);
         } else {
-            ESP_LOGD(TAG,
-                     "MQTT data received: topic_len=%d data_len=%d",
-                     event->topic_len,
-                     event->data_len);
+            const home_topic_subscription_t *subscription = home_subscription_for_event(event);
+            if (subscription != NULL) {
+                if (event->current_data_offset != 0 || event->total_data_len != event->data_len) {
+                    ESP_LOGW(TAG,
+                             "Ignoring fragmented Home tile payload: offset=%d total=%d len=%d",
+                             event->current_data_offset,
+                             event->total_data_len,
+                             event->data_len);
+                    break;
+                }
+                handle_home_topic_payload(event->client,
+                                          subscription,
+                                          event->data,
+                                          event->data_len);
+            } else {
+                ESP_LOGD(TAG,
+                         "MQTT data received: topic_len=%d data_len=%d",
+                         event->topic_len,
+                         event->data_len);
+            }
         }
         break;
     default:

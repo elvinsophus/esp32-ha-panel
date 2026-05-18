@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hapanel_home_state.h"
 #include "hapanel_ui_status.h"
 
 typedef enum {
@@ -27,4 +28,5 @@ const hapanel_ui_page_descriptor_t *hapanel_ui_page_descriptor(hapanel_ui_page_i
 hapanel_ui_page_id_t hapanel_ui_current_page(void);
 hapanel_ui_layer_t hapanel_ui_current_layer(void);
 void hapanel_ui_show_page(hapanel_ui_page_id_t page, const hapanel_ui_status_t *status);
+void hapanel_ui_set_home_state(const hapanel_home_state_t *state);
 void hapanel_ui_refresh_current_page(const hapanel_ui_status_t *status);
