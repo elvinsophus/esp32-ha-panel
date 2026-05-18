@@ -33,9 +33,6 @@ typedef struct {
     lv_obj_t *psram_label;
     lv_obj_t *entity_values[HAPANEL_HOME_ENTITY_COUNT];
     lv_obj_t *entity_dots[HAPANEL_HOME_ENTITY_COUNT];
-    lv_obj_t *wifi_value;
-    lv_obj_t *mqtt_value;
-    lv_obj_t *ota_value;
 } hapanel_home_view_t;
 
 static hapanel_ambient_view_t ambient_view;
@@ -283,38 +280,6 @@ static void configure_screen_root(lv_obj_t *root)
     configure_column(root, profile->spacing.sm);
 }
 
-static const hapanel_ui_status_item_t *find_status_item(const hapanel_ui_status_t *status,
-                                                        const char *label)
-{
-    if (status == NULL || label == NULL) {
-        return NULL;
-    }
-
-    for (size_t i = 0; i < status->item_count; ++i) {
-        if (status->items[i].label != NULL && strcmp(status->items[i].label, label) == 0) {
-            return &status->items[i];
-        }
-    }
-
-    return NULL;
-}
-
-static const char *status_value_or(const hapanel_ui_status_t *status,
-                                   const char *label,
-                                   const char *fallback)
-{
-    const hapanel_ui_status_item_t *item = find_status_item(status, label);
-    return item != NULL && item->value != NULL ? item->value : fallback;
-}
-
-static hapanel_ui_status_level_t status_level_or(const hapanel_ui_status_t *status,
-                                                 const char *label,
-                                                 hapanel_ui_status_level_t fallback)
-{
-    const hapanel_ui_status_item_t *item = find_status_item(status, label);
-    return item != NULL ? item->level : fallback;
-}
-
 static void format_uptime_clock(uint64_t uptime_ms, char *buffer, size_t buffer_size)
 {
     if (buffer == NULL || buffer_size == 0) {
@@ -350,14 +315,14 @@ static lv_obj_t *create_home_tile(lv_obj_t *parent,
 
     lv_obj_t *tile = lv_obj_create(parent);
     lv_obj_remove_style_all(tile);
-    lv_obj_set_size(tile, 204, 100);
-    lv_obj_set_style_pad_all(tile, 10, 0);
+    lv_obj_set_size(tile, 204, 126);
+    lv_obj_set_style_pad_all(tile, 14, 0);
     lv_obj_set_style_radius(tile, profile->radius.sm, 0);
     lv_obj_set_style_bg_color(tile, lv_color_hex(profile->theme.surface), 0);
     lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(tile, 1, 0);
     lv_obj_set_style_border_color(tile, lv_color_hex(profile->theme.surface_border), 0);
-    configure_column(tile, 5);
+    configure_column(tile, 7);
 
     lv_obj_t *dot = lv_obj_create(tile);
     lv_obj_remove_style_all(dot);
@@ -374,7 +339,7 @@ static lv_obj_t *create_home_tile(lv_obj_t *parent,
                                                lv_color_hex(profile->theme.text_primary));
     lv_label_set_long_mode(value_obj, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(value_obj, LV_PCT(100));
-    lv_obj_set_height(value_obj, 42);
+    lv_obj_set_height(value_obj, 58);
     lv_obj_set_style_text_line_space(value_obj, 2, 0);
 
     if (value_label != NULL) {
@@ -583,7 +548,7 @@ static void show_home_page(const hapanel_ui_status_t *status)
     lv_obj_t *grid = lv_obj_create(root);
     lv_obj_remove_style_all(grid);
     lv_obj_set_width(grid, LV_PCT(100));
-    lv_obj_set_height(grid, 332);
+    lv_obj_set_height(grid, 292);
     lv_obj_set_layout(grid, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START,
@@ -608,24 +573,13 @@ static void show_home_page(const hapanel_ui_status_t *status)
                          &home_view.entity_dots[i],
                          &home_view.entity_values[i]);
     }
-    create_home_tile(grid,
-                     "Wi-Fi",
-                     status_value_or(status, "Wi-Fi", "Offline"),
-                     color_for_status(status_level_or(status, "Wi-Fi", HAPANEL_UI_STATUS_OFFLINE)),
-                     NULL,
-                     &home_view.wifi_value);
-    create_home_tile(grid,
-                     "MQTT",
-                     status_value_or(status, "MQTT", "Offline"),
-                     color_for_status(status_level_or(status, "MQTT", HAPANEL_UI_STATUS_OFFLINE)),
-                     NULL,
-                     &home_view.mqtt_value);
-    create_home_tile(grid,
-                     "OTA",
-                     status_value_or(status, "OTA", "Unknown"),
-                     color_for_status(status_level_or(status, "OTA", HAPANEL_UI_STATUS_OFFLINE)),
-                     NULL,
-                     &home_view.ota_value);
+    lv_obj_t *footer =
+        create_label(root,
+                     "Pinned home categories update from retained Home Assistant topics.",
+                     hapanel_ui_font_static_12(),
+                     lv_color_hex(profile->theme.text_muted));
+    lv_label_set_long_mode(footer, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(footer, LV_PCT(100));
 
     home_view.created = true;
     refresh_home_page(status);
@@ -751,50 +705,6 @@ static void refresh_home_page(const hapanel_ui_status_t *status)
         }
     }
 
-    if (home_view.wifi_value != NULL) {
-        const char *value = status_value_or(status, "Wi-Fi", "Offline");
-        hapanel_ui_font_log_missing_glyphs("Wi-Fi", value, hapanel_ui_font_dynamic_16());
-        char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
-        const lv_font_t *font =
-            hapanel_ui_font_prepare_dynamic_text(value, display_text, sizeof(display_text));
-        lv_obj_set_style_text_font(home_view.wifi_value, font, 0);
-        lv_label_set_text(home_view.wifi_value, display_text);
-        lv_obj_set_style_text_color(home_view.wifi_value,
-                                    color_for_status(status_level_or(status,
-                                                                     "Wi-Fi",
-                                                                     HAPANEL_UI_STATUS_OFFLINE)),
-                                    0);
-    }
-
-    if (home_view.mqtt_value != NULL) {
-        const char *value = status_value_or(status, "MQTT", "Offline");
-        hapanel_ui_font_log_missing_glyphs("MQTT", value, hapanel_ui_font_dynamic_16());
-        char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
-        const lv_font_t *font =
-            hapanel_ui_font_prepare_dynamic_text(value, display_text, sizeof(display_text));
-        lv_obj_set_style_text_font(home_view.mqtt_value, font, 0);
-        lv_label_set_text(home_view.mqtt_value, display_text);
-        lv_obj_set_style_text_color(home_view.mqtt_value,
-                                    color_for_status(status_level_or(status,
-                                                                     "MQTT",
-                                                                     HAPANEL_UI_STATUS_OFFLINE)),
-                                    0);
-    }
-
-    if (home_view.ota_value != NULL) {
-        const char *value = status_value_or(status, "OTA", "Unknown");
-        hapanel_ui_font_log_missing_glyphs("OTA", value, hapanel_ui_font_dynamic_16());
-        char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
-        const lv_font_t *font =
-            hapanel_ui_font_prepare_dynamic_text(value, display_text, sizeof(display_text));
-        lv_obj_set_style_text_font(home_view.ota_value, font, 0);
-        lv_label_set_text(home_view.ota_value, display_text);
-        lv_obj_set_style_text_color(home_view.ota_value,
-                                    color_for_status(status_level_or(status,
-                                                                     "OTA",
-                                                                     HAPANEL_UI_STATUS_OFFLINE)),
-                                    0);
-    }
 }
 
 const hapanel_ui_page_descriptor_t *hapanel_ui_page_descriptor(hapanel_ui_page_id_t page)
