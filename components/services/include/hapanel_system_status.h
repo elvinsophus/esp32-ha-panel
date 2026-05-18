@@ -23,9 +23,11 @@ typedef enum {
     HAPANEL_SYSTEM_LEVEL_ERROR,
 } hapanel_system_level_t;
 
+#define HAPANEL_SYSTEM_STATUS_VALUE_MAX 96
+
 typedef struct {
     const char *label;
-    const char *value;
+    char value[HAPANEL_SYSTEM_STATUS_VALUE_MAX];
     hapanel_system_level_t level;
 } hapanel_system_status_item_t;
 

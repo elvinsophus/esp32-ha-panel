@@ -2,6 +2,9 @@
 
 #include "hapanel_ui.h"
 
+#include <stdio.h>
+#include <string.h>
+
 static hapanel_ui_status_level_t ui_level_from_system(hapanel_system_level_t level)
 {
     switch (level) {
@@ -19,19 +22,42 @@ static hapanel_ui_status_level_t ui_level_from_system(hapanel_system_level_t lev
     }
 }
 
-static void sync_ui_status(hapanel_runtime_t *runtime)
+static void lock_runtime(hapanel_runtime_t *runtime)
+{
+    if (runtime != NULL && runtime->lock != NULL) {
+        xSemaphoreTake(runtime->lock, portMAX_DELAY);
+    }
+}
+
+static void unlock_runtime(hapanel_runtime_t *runtime)
+{
+    if (runtime != NULL && runtime->lock != NULL) {
+        xSemaphoreGive(runtime->lock);
+    }
+}
+
+static void sync_ui_snapshot(hapanel_runtime_t *runtime)
 {
     const hapanel_system_status_t *system_status = &runtime->system_status;
 
+    lock_runtime(runtime);
     for (size_t i = 0; i < system_status->item_count; ++i) {
         runtime->ui_items[i].label = system_status->items[i].label;
-        runtime->ui_items[i].value = system_status->items[i].value;
+        snprintf(runtime->ui_item_values[i],
+                 sizeof(runtime->ui_item_values[i]),
+                 "%s",
+                 system_status->items[i].value);
+        runtime->ui_items[i].value = runtime->ui_item_values[i];
         runtime->ui_items[i].level = ui_level_from_system(system_status->items[i].level);
     }
 
     runtime->ui_status.items = runtime->ui_items;
     runtime->ui_status.item_count = system_status->item_count;
     runtime->ui_status.psram_ready = system_status->psram_ready;
+    runtime->ui_home_state = runtime->home_state;
+    runtime->ui_system_revision = system_status->revision;
+    runtime->ui_home_revision = runtime->home_state.revision;
+    unlock_runtime(runtime);
 }
 
 static void notify_status_changed(hapanel_runtime_t *runtime)
@@ -52,11 +78,12 @@ void hapanel_runtime_init(hapanel_runtime_t *runtime)
     }
 
     *runtime = (hapanel_runtime_t){0};
+    runtime->lock = xSemaphoreCreateMutex();
     hapanel_system_status_init(&runtime->system_status);
     hapanel_home_state_init(&runtime->home_state);
     runtime->requested_page = HAPANEL_UI_PAGE_SYSTEM_STATUS;
     runtime->rendered_page = HAPANEL_UI_PAGE_SYSTEM_STATUS;
-    sync_ui_status(runtime);
+    sync_ui_snapshot(runtime);
 }
 
 void hapanel_runtime_set_psram_ready(hapanel_runtime_t *runtime, bool ready)
@@ -65,9 +92,12 @@ void hapanel_runtime_set_psram_ready(hapanel_runtime_t *runtime, bool ready)
         return;
     }
 
+    lock_runtime(runtime);
     const uint32_t previous_revision = runtime->system_status.revision;
     hapanel_system_status_set_psram_ready(&runtime->system_status, ready);
-    if (runtime->system_status.revision == previous_revision) {
+    const bool changed = runtime->system_status.revision != previous_revision;
+    unlock_runtime(runtime);
+    if (!changed) {
         return;
     }
 
@@ -83,9 +113,12 @@ void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
         return;
     }
 
+    lock_runtime(runtime);
     const uint32_t previous_revision = runtime->system_status.revision;
     hapanel_system_status_set(&runtime->system_status, subsystem, value, level);
-    if (runtime->system_status.revision == previous_revision) {
+    const bool changed = runtime->system_status.revision != previous_revision;
+    unlock_runtime(runtime);
+    if (!changed) {
         return;
     }
 
@@ -101,7 +134,10 @@ void hapanel_runtime_set_home_entity(hapanel_runtime_t *runtime,
         return;
     }
 
-    if (!hapanel_home_state_update(&runtime->home_state, entity, value, online)) {
+    lock_runtime(runtime);
+    const bool changed = hapanel_home_state_update(&runtime->home_state, entity, value, online);
+    unlock_runtime(runtime);
+    if (!changed) {
         return;
     }
 
@@ -165,12 +201,13 @@ void hapanel_runtime_render_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_
         return;
     }
 
-    sync_ui_status(runtime);
-    hapanel_ui_set_home_state(&runtime->home_state);
+    sync_ui_snapshot(runtime);
+    hapanel_ui_set_home_state(&runtime->ui_home_state);
     hapanel_ui_show_page(page, &runtime->ui_status);
     runtime->requested_page = page;
     runtime->rendered_page = page;
-    runtime->rendered_revision = runtime->system_status.revision;
+    runtime->rendered_revision = runtime->ui_system_revision;
+    runtime->rendered_home_revision = runtime->ui_home_revision;
     runtime->root_visible = true;
 }
 
@@ -185,13 +222,20 @@ void hapanel_runtime_refresh_current_page(hapanel_runtime_t *runtime)
         return;
     }
 
-    if (runtime->rendered_revision == runtime->system_status.revision) {
+    lock_runtime(runtime);
+    const uint32_t system_revision = runtime->system_status.revision;
+    const uint32_t home_revision = runtime->home_state.revision;
+    unlock_runtime(runtime);
+
+    if (runtime->rendered_revision == system_revision &&
+        runtime->rendered_home_revision == home_revision) {
         return;
     }
 
-    sync_ui_status(runtime);
+    sync_ui_snapshot(runtime);
     hapanel_ui_refresh_current_page(&runtime->ui_status);
-    runtime->rendered_revision = runtime->system_status.revision;
+    runtime->rendered_revision = runtime->ui_system_revision;
+    runtime->rendered_home_revision = runtime->ui_home_revision;
 }
 
 void hapanel_runtime_render_root(hapanel_runtime_t *runtime)

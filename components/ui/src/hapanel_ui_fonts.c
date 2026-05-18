@@ -3,26 +3,12 @@
 #include "esp_log.h"
 
 #include <inttypes.h>
+#include <stddef.h>
 
 static const char *TAG = "hapanel_ui_fonts";
 
-LV_FONT_DECLARE(hapanel_font_dynamic_16);
-
-static bool dynamic_fonts_ready;
-static lv_font_t dynamic_font_16;
 static uint32_t logged_missing_codepoints[32];
 static bool missing_log_capacity_warned;
-
-static void ensure_dynamic_font_chain(void)
-{
-    if (dynamic_fonts_ready) {
-        return;
-    }
-
-    dynamic_font_16 = hapanel_font_dynamic_16;
-    dynamic_font_16.fallback = &lv_font_montserrat_16;
-    dynamic_fonts_ready = true;
-}
 
 static bool decode_utf8_next(const char *text, size_t *offset, uint32_t *codepoint)
 {
@@ -142,8 +128,171 @@ const lv_font_t *hapanel_ui_font_static_26(void)
 
 const lv_font_t *hapanel_ui_font_dynamic_16(void)
 {
-    ensure_dynamic_font_chain();
-    return &dynamic_font_16;
+    return &lv_font_montserrat_16;
+}
+
+static void append_ascii(char *output, size_t output_size, size_t *offset, const char *text)
+{
+    if (output_size == 0 || output == NULL || offset == NULL || text == NULL) {
+        return;
+    }
+
+    while (*text != '\0' && *offset + 1 < output_size) {
+        output[(*offset)++] = *text++;
+    }
+}
+
+static const char *ascii_fallback_for_codepoint(uint32_t codepoint)
+{
+    switch (codepoint) {
+    case 0x00b0:
+        return " deg";
+    case 0x00d7:
+        return "x";
+    case 0x00df:
+        return "ss";
+    case 0x00c0:
+    case 0x00c1:
+    case 0x00c2:
+    case 0x00c3:
+    case 0x00c4:
+    case 0x00c5:
+    case 0x0100:
+    case 0x0102:
+    case 0x0104:
+        return "A";
+    case 0x00e0:
+    case 0x00e1:
+    case 0x00e2:
+    case 0x00e3:
+    case 0x00e4:
+    case 0x00e5:
+    case 0x0101:
+    case 0x0103:
+    case 0x0105:
+        return "a";
+    case 0x00c7:
+    case 0x0106:
+    case 0x0108:
+    case 0x010a:
+    case 0x010c:
+        return "C";
+    case 0x00e7:
+    case 0x0107:
+    case 0x0109:
+    case 0x010b:
+    case 0x010d:
+        return "c";
+    case 0x00c8:
+    case 0x00c9:
+    case 0x00ca:
+    case 0x00cb:
+    case 0x0112:
+    case 0x0114:
+    case 0x0116:
+    case 0x0118:
+    case 0x011a:
+        return "E";
+    case 0x00e8:
+    case 0x00e9:
+    case 0x00ea:
+    case 0x00eb:
+    case 0x0113:
+    case 0x0115:
+    case 0x0117:
+    case 0x0119:
+    case 0x011b:
+        return "e";
+    case 0x00cc:
+    case 0x00cd:
+    case 0x00ce:
+    case 0x00cf:
+        return "I";
+    case 0x00ec:
+    case 0x00ed:
+    case 0x00ee:
+    case 0x00ef:
+        return "i";
+    case 0x00d1:
+        return "N";
+    case 0x00f1:
+        return "n";
+    case 0x00d2:
+    case 0x00d3:
+    case 0x00d4:
+    case 0x00d5:
+    case 0x00d6:
+    case 0x00d8:
+        return "O";
+    case 0x00f2:
+    case 0x00f3:
+    case 0x00f4:
+    case 0x00f5:
+    case 0x00f6:
+    case 0x00f8:
+        return "o";
+    case 0x00d9:
+    case 0x00da:
+    case 0x00db:
+    case 0x00dc:
+        return "U";
+    case 0x00f9:
+    case 0x00fa:
+    case 0x00fb:
+    case 0x00fc:
+        return "u";
+    case 0x00dd:
+    case 0x0178:
+        return "Y";
+    case 0x00fd:
+    case 0x00ff:
+        return "y";
+    case 0x2013:
+    case 0x2014:
+    case 0x2212:
+        return "-";
+    case 0x2018:
+    case 0x2019:
+        return "'";
+    case 0x201c:
+    case 0x201d:
+        return "\"";
+    case 0x2026:
+        return "...";
+    case 0x2713:
+        return "OK";
+    default:
+        return "?";
+    }
+}
+
+void hapanel_ui_font_prepare_dynamic_text(const char *input, char *output, size_t output_size)
+{
+    if (output == NULL || output_size == 0) {
+        return;
+    }
+
+    output[0] = '\0';
+    if (input == NULL) {
+        return;
+    }
+
+    size_t input_offset = 0;
+    size_t output_offset = 0;
+    uint32_t codepoint = 0;
+    while (decode_utf8_next(input, &input_offset, &codepoint) && output_offset + 1 < output_size) {
+        if (codepoint >= 0x20 && codepoint <= 0x7e) {
+            output[output_offset++] = (char)codepoint;
+        } else if (codepoint == '\n' || codepoint == '\r' || codepoint == '\t') {
+            output[output_offset++] = ' ';
+        } else {
+            append_ascii(output,
+                         output_size,
+                         &output_offset,
+                         ascii_fallback_for_codepoint(codepoint));
+        }
+    }
+    output[output_offset] = '\0';
 }
 
 void hapanel_ui_font_log_missing_glyphs(const char *surface, const char *text,

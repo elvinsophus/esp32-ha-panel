@@ -6,6 +6,10 @@
 
 #include <string.h>
 
+enum {
+    HAPANEL_UI_DYNAMIC_TEXT_MAX = 128,
+};
+
 typedef struct {
     bool created;
     size_t row_count;
@@ -90,7 +94,9 @@ static lv_obj_t *create_dynamic_label(lv_obj_t *parent, const char *surface, con
 {
     const lv_font_t *font = hapanel_ui_font_dynamic_16();
     hapanel_ui_font_log_missing_glyphs(surface, text, font);
-    return create_label(parent, text, font, color);
+    char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
+    hapanel_ui_font_prepare_dynamic_text(text, display_text, sizeof(display_text));
+    return create_label(parent, display_text, font, color);
 }
 
 static void configure_column(lv_obj_t *obj, int32_t row_gap)
@@ -363,7 +369,7 @@ static void show_home_page(const hapanel_ui_status_t *status)
     lv_obj_t *header = lv_obj_create(root);
     lv_obj_remove_style_all(header);
     lv_obj_set_width(header, LV_PCT(100));
-    lv_obj_set_height(header, 54);
+    lv_obj_set_height(header, 48);
     lv_obj_set_layout(header, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(header, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(header, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
@@ -371,8 +377,6 @@ static void show_home_page(const hapanel_ui_status_t *status)
 
     create_label(header, "Home", hapanel_ui_font_static_26(),
                  lv_color_hex(profile->theme.text_primary));
-    create_label(header, "Amon Sul", hapanel_ui_font_static_16(),
-                 lv_color_hex(profile->theme.text_muted));
 
     lv_obj_t *grid = lv_obj_create(root);
     lv_obj_remove_style_all(grid);
@@ -447,7 +451,11 @@ static void refresh_system_status_page(const hapanel_ui_status_t *status)
         if (root_view.status_values[i] != NULL) {
             hapanel_ui_font_log_missing_glyphs(status->items[i].label, status->items[i].value,
                                               hapanel_ui_font_dynamic_16());
-            lv_label_set_text(root_view.status_values[i], status->items[i].value);
+            char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
+            hapanel_ui_font_prepare_dynamic_text(status->items[i].value,
+                                                 display_text,
+                                                 sizeof(display_text));
+            lv_label_set_text(root_view.status_values[i], display_text);
             lv_obj_set_style_text_color(root_view.status_values[i],
                                         color_for_status(status->items[i].level),
                                         0);
@@ -492,7 +500,9 @@ static void refresh_home_page(const hapanel_ui_status_t *status)
             hapanel_ui_font_log_missing_glyphs(entity->label,
                                               entity->value,
                                               hapanel_ui_font_dynamic_16());
-            lv_label_set_text(home_view.entity_values[i], entity->value);
+            char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
+            hapanel_ui_font_prepare_dynamic_text(entity->value, display_text, sizeof(display_text));
+            lv_label_set_text(home_view.entity_values[i], display_text);
             lv_obj_set_style_text_color(home_view.entity_values[i],
                                         entity->online
                                             ? lv_color_hex(profile->theme.text_primary)
@@ -511,7 +521,9 @@ static void refresh_home_page(const hapanel_ui_status_t *status)
     if (home_view.wifi_value != NULL) {
         const char *value = status_value_or(status, "Wi-Fi", "Offline");
         hapanel_ui_font_log_missing_glyphs("Wi-Fi", value, hapanel_ui_font_dynamic_16());
-        lv_label_set_text(home_view.wifi_value, value);
+        char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
+        hapanel_ui_font_prepare_dynamic_text(value, display_text, sizeof(display_text));
+        lv_label_set_text(home_view.wifi_value, display_text);
         lv_obj_set_style_text_color(home_view.wifi_value,
                                     color_for_status(status_level_or(status,
                                                                      "Wi-Fi",
@@ -522,7 +534,9 @@ static void refresh_home_page(const hapanel_ui_status_t *status)
     if (home_view.mqtt_value != NULL) {
         const char *value = status_value_or(status, "MQTT", "Offline");
         hapanel_ui_font_log_missing_glyphs("MQTT", value, hapanel_ui_font_dynamic_16());
-        lv_label_set_text(home_view.mqtt_value, value);
+        char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
+        hapanel_ui_font_prepare_dynamic_text(value, display_text, sizeof(display_text));
+        lv_label_set_text(home_view.mqtt_value, display_text);
         lv_obj_set_style_text_color(home_view.mqtt_value,
                                     color_for_status(status_level_or(status,
                                                                      "MQTT",
@@ -533,7 +547,9 @@ static void refresh_home_page(const hapanel_ui_status_t *status)
     if (home_view.ota_value != NULL) {
         const char *value = status_value_or(status, "OTA", "Unknown");
         hapanel_ui_font_log_missing_glyphs("OTA", value, hapanel_ui_font_dynamic_16());
-        lv_label_set_text(home_view.ota_value, value);
+        char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
+        hapanel_ui_font_prepare_dynamic_text(value, display_text, sizeof(display_text));
+        lv_label_set_text(home_view.ota_value, display_text);
         lv_obj_set_style_text_color(home_view.ota_value,
                                     color_for_status(status_level_or(status,
                                                                      "OTA",

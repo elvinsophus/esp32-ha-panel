@@ -1,5 +1,8 @@
 #include "hapanel_system_status.h"
 
+#include <stdio.h>
+#include <string.h>
+
 typedef struct {
     const char *label;
     const char *initial_value;
@@ -44,6 +47,19 @@ static const hapanel_system_status_default_t DEFAULT_STATUS[HAPANEL_SYSTEM_STATU
     },
 };
 
+static void copy_status_value(char *target, size_t target_size, const char *value)
+{
+    if (target_size == 0) {
+        return;
+    }
+
+    if (value == NULL || value[0] == '\0') {
+        value = "Unknown";
+    }
+
+    snprintf(target, target_size, "%s", value);
+}
+
 void hapanel_system_status_init(hapanel_system_status_t *status)
 {
     if (status == NULL) {
@@ -56,7 +72,9 @@ void hapanel_system_status_init(hapanel_system_status_t *status)
 
     for (size_t i = 0; i < HAPANEL_SYSTEM_STATUS_COUNT; ++i) {
         status->items[i].label = DEFAULT_STATUS[i].label;
-        status->items[i].value = DEFAULT_STATUS[i].initial_value;
+        copy_status_value(status->items[i].value,
+                          sizeof(status->items[i].value),
+                          DEFAULT_STATUS[i].initial_value);
         status->items[i].level = DEFAULT_STATUS[i].initial_level;
     }
 }
@@ -84,11 +102,17 @@ void hapanel_system_status_set(hapanel_system_status_t *status,
         return;
     }
 
-    if (status->items[subsystem].value == value && status->items[subsystem].level == level) {
+    char next_value[HAPANEL_SYSTEM_STATUS_VALUE_MAX];
+    copy_status_value(next_value, sizeof(next_value), value);
+
+    if (strcmp(status->items[subsystem].value, next_value) == 0 &&
+        status->items[subsystem].level == level) {
         return;
     }
 
-    status->items[subsystem].value = value;
+    copy_status_value(status->items[subsystem].value,
+                      sizeof(status->items[subsystem].value),
+                      next_value);
     status->items[subsystem].level = level;
     status->revision++;
 }

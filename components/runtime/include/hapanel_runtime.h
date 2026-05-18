@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+
 #include "hapanel_home_state.h"
 #include "hapanel_system_status.h"
 #include "hapanel_ui_layer.h"
@@ -11,9 +14,15 @@
 typedef struct {
     hapanel_system_status_t system_status;
     hapanel_home_state_t home_state;
+    SemaphoreHandle_t lock;
     hapanel_ui_status_item_t ui_items[HAPANEL_SYSTEM_STATUS_COUNT];
+    char ui_item_values[HAPANEL_SYSTEM_STATUS_COUNT][HAPANEL_SYSTEM_STATUS_VALUE_MAX];
     hapanel_ui_status_t ui_status;
+    hapanel_home_state_t ui_home_state;
+    uint32_t ui_system_revision;
+    uint32_t ui_home_revision;
     uint32_t rendered_revision;
+    uint32_t rendered_home_revision;
     hapanel_ui_page_id_t requested_page;
     hapanel_ui_page_id_t rendered_page;
     bool root_visible;
