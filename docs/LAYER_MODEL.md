@@ -34,6 +34,9 @@ Current pages:
 - `HAPANEL_UI_PAGE_SECURITY`: domain-layer placeholder for security sensors and
   alerts
 - `HAPANEL_UI_PAGE_APPS`: domain-layer placeholder for optional panel utilities
+- `HAPANEL_UI_PAGE_HOME_SCENE`: detail-layer scaffold for the Scene category
+- `HAPANEL_UI_PAGE_HOME_LIGHTS`: detail-layer scaffold for the Lights category
+- `HAPANEL_UI_PAGE_HOME_CLIMATE`: detail-layer scaffold for the Climate category
 
 The current page router is intentionally minimal. It gives future Home
 Assistant pages a stable navigation target. During bring-up, MQTT commands
@@ -43,3 +46,5 @@ Assistant pages a stable navigation target. During bring-up, MQTT commands
 The Root page also supports one-finger spatial gestures: right to Home Status,
 up to Security, and left to Apps. The opposite gesture on each domain page
 returns to Root.
+Home Status category tiles open detail pages. A detail page returns to Home
+Status through its fixed Home target or a right swipe.

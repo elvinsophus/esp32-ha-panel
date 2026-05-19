@@ -37,12 +37,21 @@ typedef struct {
 
 typedef struct {
     bool created;
+    hapanel_home_entity_id_t entity;
+    lv_obj_t *psram_label;
+    lv_obj_t *value_label;
+    lv_obj_t *accent_dot;
+} hapanel_home_detail_view_t;
+
+typedef struct {
+    bool created;
     lv_obj_t *psram_label;
 } hapanel_static_page_view_t;
 
 static hapanel_ambient_view_t ambient_view;
 static hapanel_root_view_t root_view;
 static hapanel_home_view_t home_view;
+static hapanel_home_detail_view_t home_detail_view;
 static hapanel_static_page_view_t static_page_view;
 static const hapanel_home_state_t *home_state;
 static hapanel_ui_page_request_callback_t page_request_callback;
@@ -54,6 +63,9 @@ static void show_system_status_page(const hapanel_ui_status_t *status);
 static void refresh_system_status_page(const hapanel_ui_status_t *status);
 static void show_home_page(const hapanel_ui_status_t *status);
 static void refresh_home_page(const hapanel_ui_status_t *status);
+static void show_home_detail_page(const hapanel_ui_status_t *status,
+                                  hapanel_home_entity_id_t entity_id);
+static void refresh_home_detail_page(const hapanel_ui_status_t *status);
 static void show_security_page(const hapanel_ui_status_t *status);
 static void show_apps_page(const hapanel_ui_status_t *status);
 static void refresh_static_page(const hapanel_ui_status_t *status);
@@ -84,6 +96,21 @@ static const hapanel_ui_page_descriptor_t page_descriptors[HAPANEL_UI_PAGE_COUNT
         .layer = HAPANEL_UI_LAYER_DOMAIN,
         .name = "Apps",
     },
+    [HAPANEL_UI_PAGE_HOME_SCENE] = {
+        .id = HAPANEL_UI_PAGE_HOME_SCENE,
+        .layer = HAPANEL_UI_LAYER_DETAIL,
+        .name = "Scene Detail",
+    },
+    [HAPANEL_UI_PAGE_HOME_LIGHTS] = {
+        .id = HAPANEL_UI_PAGE_HOME_LIGHTS,
+        .layer = HAPANEL_UI_LAYER_DETAIL,
+        .name = "Lights Detail",
+    },
+    [HAPANEL_UI_PAGE_HOME_CLIMATE] = {
+        .id = HAPANEL_UI_PAGE_HOME_CLIMATE,
+        .layer = HAPANEL_UI_LAYER_DETAIL,
+        .name = "Climate Detail",
+    },
 };
 
 static hapanel_ui_page_id_t current_page = HAPANEL_UI_PAGE_ROOT;
@@ -99,6 +126,7 @@ static void reset_views(void)
     ambient_view = (hapanel_ambient_view_t){0};
     root_view = (hapanel_root_view_t){0};
     home_view = (hapanel_home_view_t){0};
+    home_detail_view = (hapanel_home_detail_view_t){0};
     static_page_view = (hapanel_static_page_view_t){0};
 }
 
@@ -294,6 +322,32 @@ static void request_page(hapanel_ui_page_id_t page)
     page_request_callback(page, page_request_context);
 }
 
+static hapanel_ui_page_id_t home_detail_page_for_entity(hapanel_home_entity_id_t entity_id)
+{
+    switch (entity_id) {
+    case HAPANEL_HOME_ENTITY_SCENE:
+        return HAPANEL_UI_PAGE_HOME_SCENE;
+    case HAPANEL_HOME_ENTITY_LIGHTS:
+        return HAPANEL_UI_PAGE_HOME_LIGHTS;
+    case HAPANEL_HOME_ENTITY_CLIMATE:
+    default:
+        return HAPANEL_UI_PAGE_HOME_CLIMATE;
+    }
+}
+
+static hapanel_home_entity_id_t entity_for_home_detail_page(hapanel_ui_page_id_t page)
+{
+    switch (page) {
+    case HAPANEL_UI_PAGE_HOME_SCENE:
+        return HAPANEL_HOME_ENTITY_SCENE;
+    case HAPANEL_UI_PAGE_HOME_LIGHTS:
+        return HAPANEL_HOME_ENTITY_LIGHTS;
+    case HAPANEL_UI_PAGE_HOME_CLIMATE:
+    default:
+        return HAPANEL_HOME_ENTITY_CLIMATE;
+    }
+}
+
 static void make_page_target(lv_obj_t *obj, hapanel_ui_page_id_t page)
 {
     lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
@@ -324,6 +378,13 @@ static void gesture_event_cb(lv_event_t *event)
     case HAPANEL_UI_PAGE_HOME:
         if (dir == LV_DIR_LEFT) {
             request_page(HAPANEL_UI_PAGE_ROOT);
+        }
+        break;
+    case HAPANEL_UI_PAGE_HOME_SCENE:
+    case HAPANEL_UI_PAGE_HOME_LIGHTS:
+    case HAPANEL_UI_PAGE_HOME_CLIMATE:
+        if (dir == LV_DIR_RIGHT) {
+            request_page(HAPANEL_UI_PAGE_HOME);
         }
         break;
     case HAPANEL_UI_PAGE_SECURITY:
@@ -447,6 +508,15 @@ static lv_obj_t *create_home_tile(lv_obj_t *parent,
     }
 
     return tile;
+}
+
+static const hapanel_home_entity_t *home_entity_or_null(hapanel_home_entity_id_t entity_id)
+{
+    if (home_state == NULL || entity_id >= HAPANEL_HOME_ENTITY_COUNT) {
+        return NULL;
+    }
+
+    return &home_state->entities[entity_id];
 }
 
 static void show_root_page(const hapanel_ui_status_t *status)
@@ -663,14 +733,16 @@ static void show_home_page(const hapanel_ui_status_t *status)
     for (size_t i = 0; i < HAPANEL_HOME_ENTITY_COUNT; ++i) {
         const hapanel_home_entity_t *entity =
             home_state != NULL ? &home_state->entities[i] : NULL;
-        create_home_tile(grid,
-                         entity != NULL ? entity->label : "Entity",
-                         entity != NULL ? entity->value : "Unknown",
-                         entity != NULL && entity->online
-                             ? lv_color_hex(entity_accents[i])
-                             : lv_color_hex(profile->theme.status_offline),
-                         &home_view.entity_dots[i],
-                         &home_view.entity_values[i]);
+        lv_obj_t *tile =
+            create_home_tile(grid,
+                             entity != NULL ? entity->label : "Entity",
+                             entity != NULL ? entity->value : "Unknown",
+                             entity != NULL && entity->online
+                                 ? lv_color_hex(entity_accents[i])
+                                 : lv_color_hex(profile->theme.status_offline),
+                             &home_view.entity_dots[i],
+                             &home_view.entity_values[i]);
+        make_page_target(tile, home_detail_page_for_entity((hapanel_home_entity_id_t)i));
     }
     lv_obj_t *footer =
         create_label(root,
@@ -683,6 +755,93 @@ static void show_home_page(const hapanel_ui_status_t *status)
     home_view.created = true;
     enable_page_gestures(root);
     refresh_home_page(status);
+}
+
+static void show_home_detail_page(const hapanel_ui_status_t *status,
+                                  hapanel_home_entity_id_t entity_id)
+{
+    const hapanel_profile_t *profile = ui_profile();
+    const hapanel_home_entity_t *entity = home_entity_or_null(entity_id);
+    const char *label = entity != NULL ? entity->label : "Home";
+    const char *value = entity != NULL ? entity->value : "Unknown";
+    const bool online = entity != NULL && entity->online;
+
+    const uint32_t entity_accents[HAPANEL_HOME_ENTITY_COUNT] = {
+        [HAPANEL_HOME_ENTITY_SCENE] = 0x7ec8e3,
+        [HAPANEL_HOME_ENTITY_LIGHTS] = 0xf0c674,
+        [HAPANEL_HOME_ENTITY_CLIMATE] = 0x9ccfd8,
+    };
+
+    reset_views();
+    home_detail_view.entity = entity_id;
+
+    lv_obj_t *screen = lv_screen_active();
+    lv_obj_clean(screen);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(profile->theme.background), 0);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
+
+    lv_obj_t *root = lv_obj_create(screen);
+    configure_screen_root(root);
+
+    create_status_bar(root, status, &home_detail_view.psram_label, NULL);
+
+    lv_obj_t *header = lv_obj_create(root);
+    lv_obj_remove_style_all(header);
+    lv_obj_set_width(header, LV_PCT(100));
+    lv_obj_set_height(header, 64);
+    lv_obj_set_layout(header, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t *copy = lv_obj_create(header);
+    lv_obj_remove_style_all(copy);
+    configure_column(copy, 4);
+    create_label(copy, label, hapanel_ui_font_static_26(),
+                 lv_color_hex(profile->theme.text_primary));
+    create_label(copy, "Home detail", hapanel_ui_font_static_12(),
+                 lv_color_hex(profile->theme.text_muted));
+
+    lv_obj_t *home_target =
+        create_pill_label(header, "Home", lv_color_hex(profile->theme.text_muted));
+    make_page_target(home_target, HAPANEL_UI_PAGE_HOME);
+
+    lv_obj_t *panel = create_panel(root);
+    lv_obj_set_height(panel, 250);
+    lv_obj_set_style_pad_all(panel, profile->spacing.md, 0);
+    lv_obj_set_style_pad_row(panel, profile->spacing.md, 0);
+
+    home_detail_view.accent_dot = lv_obj_create(panel);
+    lv_obj_remove_style_all(home_detail_view.accent_dot);
+    lv_obj_set_size(home_detail_view.accent_dot, 10, 10);
+    lv_obj_set_style_radius(home_detail_view.accent_dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(home_detail_view.accent_dot,
+                              online ? lv_color_hex(entity_accents[entity_id])
+                                     : lv_color_hex(profile->theme.status_offline),
+                              0);
+    lv_obj_set_style_bg_opa(home_detail_view.accent_dot, LV_OPA_COVER, 0);
+
+    home_detail_view.value_label =
+        create_dynamic_label(panel,
+                             label,
+                             value,
+                             online ? lv_color_hex(profile->theme.text_primary)
+                                    : lv_color_hex(profile->theme.text_muted));
+    lv_label_set_long_mode(home_detail_view.value_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(home_detail_view.value_label, LV_PCT(100));
+    lv_obj_set_style_text_line_space(home_detail_view.value_label, 3, 0);
+
+    lv_obj_t *note =
+        create_label(panel,
+                     "Controls and entity lists will appear here once HA mapping is wired.",
+                     hapanel_ui_font_static_12(),
+                     lv_color_hex(profile->theme.text_muted));
+    lv_label_set_long_mode(note, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(note, LV_PCT(100));
+
+    home_detail_view.created = true;
+    enable_page_gestures(root);
+    refresh_home_detail_page(status);
 }
 
 static void show_placeholder_page(const hapanel_ui_status_t *status,
@@ -904,6 +1063,53 @@ static void refresh_home_page(const hapanel_ui_status_t *status)
 
 }
 
+static void refresh_home_detail_page(const hapanel_ui_status_t *status)
+{
+    if (!home_detail_view.created || status == NULL) {
+        return;
+    }
+
+    const hapanel_profile_t *profile = ui_profile();
+    const hapanel_home_entity_t *entity = home_entity_or_null(home_detail_view.entity);
+    if (home_detail_view.psram_label != NULL) {
+        lv_label_set_text(home_detail_view.psram_label, status->psram_ready ? "PSRAM" : "RAM");
+        lv_obj_set_style_text_color(home_detail_view.psram_label,
+                                    status->psram_ready ? lv_color_hex(profile->theme.status_ok)
+                                                       : lv_color_hex(profile->theme.status_warning),
+                                    0);
+    }
+
+    if (entity == NULL) {
+        return;
+    }
+
+    const uint32_t entity_accents[HAPANEL_HOME_ENTITY_COUNT] = {
+        [HAPANEL_HOME_ENTITY_SCENE] = 0x7ec8e3,
+        [HAPANEL_HOME_ENTITY_LIGHTS] = 0xf0c674,
+        [HAPANEL_HOME_ENTITY_CLIMATE] = 0x9ccfd8,
+    };
+
+    if (home_detail_view.accent_dot != NULL) {
+        lv_obj_set_style_bg_color(home_detail_view.accent_dot,
+                                  entity->online ? lv_color_hex(entity_accents[home_detail_view.entity])
+                                                 : lv_color_hex(profile->theme.status_offline),
+                                  0);
+    }
+
+    if (home_detail_view.value_label != NULL) {
+        char display_text[HAPANEL_UI_DYNAMIC_TEXT_MAX];
+        const lv_font_t *font =
+            hapanel_ui_font_prepare_dynamic_text(entity->value, display_text, sizeof(display_text));
+        hapanel_ui_font_log_missing_glyphs(entity->label, entity->value, font);
+        lv_obj_set_style_text_font(home_detail_view.value_label, font, 0);
+        lv_label_set_text(home_detail_view.value_label, display_text);
+        lv_obj_set_style_text_color(home_detail_view.value_label,
+                                    entity->online ? lv_color_hex(profile->theme.text_primary)
+                                                   : lv_color_hex(profile->theme.text_muted),
+                                    0);
+    }
+}
+
 static void refresh_static_page(const hapanel_ui_status_t *status)
 {
     if (!static_page_view.created || status == NULL) {
@@ -963,6 +1169,11 @@ void hapanel_ui_show_page(hapanel_ui_page_id_t page, const hapanel_ui_status_t *
     case HAPANEL_UI_PAGE_HOME:
         show_home_page(status);
         break;
+    case HAPANEL_UI_PAGE_HOME_SCENE:
+    case HAPANEL_UI_PAGE_HOME_LIGHTS:
+    case HAPANEL_UI_PAGE_HOME_CLIMATE:
+        show_home_detail_page(status, entity_for_home_detail_page(page));
+        break;
     case HAPANEL_UI_PAGE_SECURITY:
         show_security_page(status);
         break;
@@ -989,6 +1200,11 @@ void hapanel_ui_refresh_current_page(const hapanel_ui_status_t *status)
         break;
     case HAPANEL_UI_PAGE_HOME:
         refresh_home_page(status);
+        break;
+    case HAPANEL_UI_PAGE_HOME_SCENE:
+    case HAPANEL_UI_PAGE_HOME_LIGHTS:
+    case HAPANEL_UI_PAGE_HOME_CLIMATE:
+        refresh_home_detail_page(status);
         break;
     case HAPANEL_UI_PAGE_SECURITY:
     case HAPANEL_UI_PAGE_APPS:

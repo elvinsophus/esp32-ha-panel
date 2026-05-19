@@ -7,6 +7,7 @@ One-finger swipe:
 - Home Status -> Root: swipe left
 - Security -> Root: swipe down
 - Apps -> Root: swipe right
+- Home detail -> Home Status: swipe right
 
 The current firmware implements this first spatial swipe set using LVGL gesture
 events. Status/quick-action gestures remain deferred so the top edge does not
