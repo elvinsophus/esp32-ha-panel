@@ -30,6 +30,8 @@ typedef struct {
     void *refresh_context;
     void (*status_callback)(void *context);
     void *status_context;
+    void (*home_action_callback)(const hapanel_home_action_t *action, void *context);
+    void *home_action_context;
 } hapanel_runtime_t;
 
 void hapanel_runtime_init(hapanel_runtime_t *runtime);
@@ -39,6 +41,10 @@ void hapanel_runtime_set_refresh_callback(hapanel_runtime_t *runtime,
 void hapanel_runtime_set_status_callback(hapanel_runtime_t *runtime,
                                          void (*callback)(void *context),
                                          void *context);
+void hapanel_runtime_set_home_action_callback(
+    hapanel_runtime_t *runtime,
+    void (*callback)(const hapanel_home_action_t *action, void *context),
+    void *context);
 void hapanel_runtime_set_psram_ready(hapanel_runtime_t *runtime, bool ready);
 void hapanel_runtime_set_status(hapanel_runtime_t *runtime,
                                 hapanel_system_subsystem_t subsystem,
@@ -55,6 +61,9 @@ void hapanel_runtime_request_refresh(hapanel_runtime_t *runtime);
 void hapanel_runtime_show_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page);
 void hapanel_runtime_handle_ui_page_request(hapanel_runtime_t *runtime,
                                             hapanel_ui_page_id_t page);
+void hapanel_runtime_handle_home_action_request(hapanel_runtime_t *runtime,
+                                                hapanel_home_entity_id_t entity,
+                                                size_t detail_index);
 void hapanel_runtime_render_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page);
 void hapanel_runtime_refresh_current_page(hapanel_runtime_t *runtime);
 void hapanel_runtime_render_root(hapanel_runtime_t *runtime);

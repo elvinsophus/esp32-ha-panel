@@ -8,6 +8,7 @@ One-finger swipe:
 - Security -> Root: swipe down
 - Apps -> Root: swipe right
 - Home detail -> Home Status: swipe right
+- Home detail row tap: publish a Home action event over MQTT
 
 The current firmware implements this first spatial swipe set using LVGL gesture
 events. Status/quick-action gestures remain deferred so the top edge does not

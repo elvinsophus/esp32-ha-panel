@@ -4,11 +4,7 @@
  * Opts: --size 16 --bpp 4 --format lvgl --font managed_components\lvgl__lvgl\scripts\built_in_font\Montserrat-Medium.ttf -r 0x20-0x7E -r 0xA0-0x17F --lv-font-name hapanel_font_dynamic_16 --output build\hapanel_font_dynamic_16_montserrat.c
  ******************************************************************************/
 
-#ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
-#else
-#include "lvgl/lvgl.h"
-#endif
 
 #ifndef HAPANEL_FONT_DYNAMIC_16
 #define HAPANEL_FONT_DYNAMIC_16 1
@@ -3695,4 +3691,3 @@ lv_font_t hapanel_font_dynamic_16 = {
 
 
 #endif /*#if HAPANEL_FONT_DYNAMIC_16*/
-

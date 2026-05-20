@@ -50,6 +50,15 @@ menu "HAPanel MQTT"
             Retained JSON topic with live panel state such as service statuses,
             runtime revision, uptime, and PSRAM readiness.
 
+    config HAPANEL_MQTT_HOME_ACTION_TOPIC
+        string "MQTT Home action topic"
+        default "hapanel/home/action"
+        help
+            Non-retained JSON topic published when a Home detail row is tapped.
+            Home Assistant can subscribe to this topic during bring-up and map
+            panel presses to automations without the firmware knowing entity
+            command semantics yet.
+
     config HAPANEL_MQTT_COMMAND_TOPIC
         string "MQTT command topic"
         default "hapanel/device/command"

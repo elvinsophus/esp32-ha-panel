@@ -60,6 +60,8 @@ static hapanel_static_page_view_t static_page_view;
 static const hapanel_home_state_t *home_state;
 static hapanel_ui_page_request_callback_t page_request_callback;
 static void *page_request_context;
+static hapanel_ui_home_action_callback_t home_action_callback;
+static void *home_action_context;
 
 static void show_root_page(const hapanel_ui_status_t *status);
 static void refresh_root_page(const hapanel_ui_status_t *status);
@@ -362,6 +364,34 @@ static void make_page_target(lv_obj_t *obj, hapanel_ui_page_id_t page)
     lv_obj_set_style_bg_opa(obj, LV_OPA_80, LV_STATE_PRESSED);
 }
 
+static void request_home_action_event_cb(lv_event_t *event)
+{
+    if (lv_event_get_code(event) != LV_EVENT_CLICKED || home_action_callback == NULL) {
+        return;
+    }
+
+    const uintptr_t detail_index = (uintptr_t)lv_event_get_user_data(event);
+    if (detail_index >= HAPANEL_HOME_DETAIL_ITEM_COUNT) {
+        return;
+    }
+
+    home_action_callback(home_detail_view.entity, (size_t)detail_index, home_action_context);
+}
+
+static void make_home_action_target(lv_obj_t *obj, size_t detail_index)
+{
+    const hapanel_profile_t *profile = ui_profile();
+
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(obj,
+                        request_home_action_event_cb,
+                        LV_EVENT_CLICKED,
+                        (void *)(uintptr_t)detail_index);
+    lv_obj_set_style_radius(obj, profile->radius.sm, LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(profile->theme.surface_border), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_30, LV_STATE_PRESSED);
+}
+
 static void gesture_event_cb(lv_event_t *event)
 {
     if (lv_event_get_code(event) != LV_EVENT_GESTURE) {
@@ -567,6 +597,11 @@ static void create_home_detail_row(lv_obj_t *parent,
     lv_label_set_long_mode(value, LV_LABEL_LONG_DOT);
     lv_obj_set_width(value, 230);
     lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, 0);
+    make_home_action_target(row, index);
+    make_home_action_target(left, index);
+    make_home_action_target(dot, index);
+    make_home_action_target(label, index);
+    make_home_action_target(value, index);
 
     if (index < HAPANEL_HOME_DETAIL_ITEM_COUNT) {
         home_detail_view.detail_dots[index] = dot;
@@ -1262,6 +1297,13 @@ void hapanel_ui_set_page_request_callback(hapanel_ui_page_request_callback_t cal
 {
     page_request_callback = callback;
     page_request_context = context;
+}
+
+void hapanel_ui_set_home_action_callback(hapanel_ui_home_action_callback_t callback,
+                                         void *context)
+{
+    home_action_callback = callback;
+    home_action_context = context;
 }
 
 void hapanel_ui_show_page(hapanel_ui_page_id_t page, const hapanel_ui_status_t *status)

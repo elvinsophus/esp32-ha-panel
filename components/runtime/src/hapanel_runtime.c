@@ -189,6 +189,19 @@ void hapanel_runtime_set_status_callback(hapanel_runtime_t *runtime,
     runtime->status_context = context;
 }
 
+void hapanel_runtime_set_home_action_callback(
+    hapanel_runtime_t *runtime,
+    void (*callback)(const hapanel_home_action_t *action, void *context),
+    void *context)
+{
+    if (runtime == NULL) {
+        return;
+    }
+
+    runtime->home_action_callback = callback;
+    runtime->home_action_context = context;
+}
+
 void hapanel_runtime_request_refresh(hapanel_runtime_t *runtime)
 {
     if (runtime == NULL || runtime->refresh_callback == NULL) {
@@ -228,6 +241,38 @@ void hapanel_runtime_handle_ui_page_request(hapanel_runtime_t *runtime,
     if (runtime->status_callback != NULL) {
         runtime->status_callback(runtime->status_context);
     }
+}
+
+void hapanel_runtime_handle_home_action_request(hapanel_runtime_t *runtime,
+                                                hapanel_home_entity_id_t entity,
+                                                size_t detail_index)
+{
+    if (runtime == NULL || runtime->home_action_callback == NULL ||
+        entity >= HAPANEL_HOME_ENTITY_COUNT || detail_index >= HAPANEL_HOME_DETAIL_ITEM_COUNT) {
+        return;
+    }
+
+    hapanel_home_action_t action = {
+        .entity = entity,
+        .detail_index = detail_index,
+    };
+
+    lock_runtime(runtime);
+    const hapanel_home_entity_t *category = &runtime->home_state.entities[entity];
+    if (detail_index >= category->detail_count) {
+        unlock_runtime(runtime);
+        return;
+    }
+
+    const hapanel_home_detail_item_t *detail = &category->details[detail_index];
+    snprintf(action.category, sizeof(action.category), "%s", category->label);
+    snprintf(action.label, sizeof(action.label), "%s", detail->label);
+    snprintf(action.value, sizeof(action.value), "%s", detail->value);
+    action.online = detail->online;
+    action.revision = detail->revision;
+    unlock_runtime(runtime);
+
+    runtime->home_action_callback(&action, runtime->home_action_context);
 }
 
 void hapanel_runtime_render_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page)

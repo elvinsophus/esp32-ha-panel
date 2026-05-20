@@ -97,6 +97,8 @@ PSRAM readiness entities read from `CONFIG_HAPANEL_MQTT_DEVICE_STATE_TOPIC`.
 The top-level `ui` object reports the requested page, rendered page, and layer
 for page-router bring-up. The top-level `home` object reports the current Home
 tile labels, values, online flags, and revisions.
+Home detail row taps publish non-retained action events to
+`CONFIG_HAPANEL_MQTT_HOME_ACTION_TOPIC`.
 Wi-Fi, MQTT, and OTA are also exposed as top-level `wifi`, `mqtt`, and `ota`
 objects in the retained state payload so discovery templates do not depend on
 service-array ordering. The top-level `ota.preflight` object reports whether
@@ -231,6 +233,7 @@ topics:
 CONFIG_HAPANEL_MQTT_HOME_SCENE_TOPIC    default hapanel/home/scene
 CONFIG_HAPANEL_MQTT_HOME_LIGHTS_TOPIC   default hapanel/home/lights
 CONFIG_HAPANEL_MQTT_HOME_CLIMATE_TOPIC  default hapanel/home/climate
+CONFIG_HAPANEL_MQTT_HOME_ACTION_TOPIC   default hapanel/home/action
 ```
 
 The first line becomes the matching Home tile summary. Optional following lines
@@ -242,6 +245,12 @@ the category offline; any other summary marks it online.
 This stays deliberately small: the firmware keeps a fixed number of detail
 rows per category and does not parse a large Home Assistant JSON object on the
 panel.
+
+When a detail row is tapped, the panel publishes a non-retained event:
+
+```json
+{"schema":"hapanel.home_action.v1","entity":"lights","category":"Lights","detail_index":0,"label":"Kitchen","value":"On","online":true}
+```
 
 Manual publish example:
 

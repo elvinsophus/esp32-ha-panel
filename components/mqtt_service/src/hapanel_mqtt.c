@@ -1246,6 +1246,79 @@ static void publish_command_result(esp_mqtt_client_handle_t client,
     }
 }
 
+static const char *home_entity_key(hapanel_home_entity_id_t entity)
+{
+    switch (entity) {
+    case HAPANEL_HOME_ENTITY_SCENE:
+        return "scene";
+    case HAPANEL_HOME_ENTITY_LIGHTS:
+        return "lights";
+    case HAPANEL_HOME_ENTITY_CLIMATE:
+        return "climate";
+    default:
+        return "unknown";
+    }
+}
+
+static void home_action_callback(const hapanel_home_action_t *action, void *context)
+{
+    (void)context;
+
+    if (action == NULL || mqtt_client == NULL || !mqtt_connected) {
+        return;
+    }
+
+    char category[HAPANEL_HOME_ENTITY_LABEL_MAX * 2];
+    char label[HAPANEL_HOME_DETAIL_LABEL_MAX * 2];
+    char value[HAPANEL_HOME_DETAIL_VALUE_MAX * 2];
+    json_escape(action->category, category, sizeof(category));
+    json_escape(action->label, label, sizeof(label));
+    json_escape(action->value, value, sizeof(value));
+
+    char payload[384];
+    const int payload_len = snprintf(payload,
+                                     sizeof(payload),
+                                     "{\"schema\":\"hapanel.home_action.v1\","
+                                     "\"entity\":\"%s\","
+                                     "\"category\":\"%s\","
+                                     "\"detail_index\":%u,"
+                                     "\"label\":\"%s\","
+                                     "\"value\":\"%s\","
+                                     "\"online\":%s,"
+                                     "\"revision\":%" PRIu32 ","
+                                     "\"uptime_ms\":%" PRIu64 "}",
+                                     home_entity_key(action->entity),
+                                     category,
+                                     (unsigned)action->detail_index,
+                                     label,
+                                     value,
+                                     action->online ? "true" : "false",
+                                     action->revision,
+                                     (uint64_t)(esp_timer_get_time() / 1000));
+
+    if (payload_len < 0 || payload_len >= (int)sizeof(payload)) {
+        ESP_LOGW(TAG, "MQTT Home action payload truncated; skipping publish");
+        return;
+    }
+
+    const int msg_id = esp_mqtt_client_publish(mqtt_client,
+                                               CONFIG_HAPANEL_MQTT_HOME_ACTION_TOPIC,
+                                               payload,
+                                               payload_len,
+                                               0,
+                                               0);
+    if (msg_id < 0) {
+        ESP_LOGW(TAG, "Failed to publish MQTT Home action");
+    } else {
+        ESP_LOGI(TAG,
+                 "Published MQTT Home action: topic=%s entity=%s detail=%u msg_id=%d",
+                 CONFIG_HAPANEL_MQTT_HOME_ACTION_TOPIC,
+                 home_entity_key(action->entity),
+                 (unsigned)action->detail_index,
+                 msg_id);
+    }
+}
+
 static void status_change_callback(void *context)
 {
     (void)context;
@@ -1704,6 +1777,7 @@ esp_err_t hapanel_mqtt_start(hapanel_runtime_t *runtime)
 
     mqtt_runtime = runtime;
     hapanel_runtime_set_status_callback(runtime, status_change_callback, NULL);
+    hapanel_runtime_set_home_action_callback(runtime, home_action_callback, NULL);
 
     if (!has_configured_broker()) {
         ESP_LOGI(TAG, "MQTT broker is not configured");

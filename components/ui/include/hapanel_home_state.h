@@ -38,6 +38,16 @@ typedef struct {
     uint32_t revision;
 } hapanel_home_state_t;
 
+typedef struct {
+    hapanel_home_entity_id_t entity;
+    size_t detail_index;
+    char category[HAPANEL_HOME_ENTITY_LABEL_MAX];
+    char label[HAPANEL_HOME_DETAIL_LABEL_MAX];
+    char value[HAPANEL_HOME_DETAIL_VALUE_MAX];
+    bool online;
+    uint32_t revision;
+} hapanel_home_action_t;
+
 void hapanel_home_state_init(hapanel_home_state_t *state);
 bool hapanel_home_state_update(hapanel_home_state_t *state,
                                hapanel_home_entity_id_t entity,
