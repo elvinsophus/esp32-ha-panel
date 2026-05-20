@@ -224,8 +224,8 @@ The script reads broker and credential settings from `sdkconfig` and
 
 ## Home Page Tile Topics
 
-The first Home page scaffold listens to simple text payloads on three
-configurable topics:
+The Home page listens to compact retained text payloads on three configurable
+topics:
 
 ```text
 CONFIG_HAPANEL_MQTT_HOME_SCENE_TOPIC    default hapanel/home/scene
@@ -233,10 +233,15 @@ CONFIG_HAPANEL_MQTT_HOME_LIGHTS_TOPIC   default hapanel/home/lights
 CONFIG_HAPANEL_MQTT_HOME_CLIMATE_TOPIC  default hapanel/home/climate
 ```
 
-Each payload is copied directly into the matching tile. Empty, `unknown`,
-`unavailable`, and `offline` mark the tile offline; any other text marks it
-online. This is intentionally small and works for retained Home Assistant MQTT
-state topics or manual bring-up publishes.
+The first line becomes the matching Home tile summary. Optional following lines
+become detail rows on that category page. Detail rows accept either
+`Label: Value` or `Label=Value`; rows without a separator are displayed as
+numbered details. Empty, `unknown`, `unavailable`, and `offline` summaries mark
+the category offline; any other summary marks it online.
+
+This stays deliberately small: the firmware keeps a fixed number of detail
+rows per category and does not parse a large Home Assistant JSON object on the
+panel.
 
 Manual publish example:
 
@@ -244,4 +249,13 @@ Manual publish example:
 .\tools\mqtt_publish.ps1 -Topic hapanel/home/scene -Payload "Dinner" -Retain
 .\tools\mqtt_publish.ps1 -Topic hapanel/home/lights -Payload "Kitchen on" -Retain
 .\tools\mqtt_publish.ps1 -Topic hapanel/home/climate -Payload "22.5 C" -Retain
+```
+
+Multi-line detail example:
+
+```text
+Kitchen on
+Kitchen: On
+Dining: Off
+Hall: Off
 ```

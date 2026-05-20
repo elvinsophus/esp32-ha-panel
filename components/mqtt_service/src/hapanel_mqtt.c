@@ -442,12 +442,39 @@ static bool append_home_state_object(char *buffer,
                          buffer_size,
                          offset,
                          "%s{\"label\":\"%s\",\"value\":\"%s\",\"online\":%s,"
-                         "\"revision\":%" PRIu32 "}",
+                         "\"revision\":%" PRIu32 ",\"details\":[",
                          i == 0 ? "" : ",",
                          label,
                          value,
                          entity->online ? "true" : "false",
                          entity->revision)) {
+            return false;
+        }
+
+        const size_t detail_count = entity->detail_count < HAPANEL_HOME_DETAIL_ITEM_COUNT
+                                        ? entity->detail_count
+                                        : HAPANEL_HOME_DETAIL_ITEM_COUNT;
+        for (size_t detail = 0; detail < detail_count; ++detail) {
+            const hapanel_home_detail_item_t *item = &entity->details[detail];
+            char detail_label[HAPANEL_HOME_DETAIL_LABEL_MAX * 2];
+            char detail_value[HAPANEL_HOME_DETAIL_VALUE_MAX * 2];
+            json_escape(item->label, detail_label, sizeof(detail_label));
+            json_escape(item->value, detail_value, sizeof(detail_value));
+            if (!append_text(buffer,
+                             buffer_size,
+                             offset,
+                             "%s{\"label\":\"%s\",\"value\":\"%s\",\"online\":%s,"
+                             "\"revision\":%" PRIu32 "}",
+                             detail == 0 ? "" : ",",
+                             detail_label,
+                             detail_value,
+                             item->online ? "true" : "false",
+                             item->revision)) {
+                return false;
+            }
+        }
+
+        if (!append_text(buffer, buffer_size, offset, "]}")) {
             return false;
         }
     }
@@ -1316,7 +1343,7 @@ static void handle_home_topic_payload(esp_mqtt_client_handle_t client,
         return;
     }
 
-    char value[HAPANEL_HOME_ENTITY_VALUE_MAX];
+    char value[256];
     const size_t copy_len = payload_len < (int)(sizeof(value) - 1)
                                 ? (size_t)payload_len
                                 : sizeof(value) - 1;
@@ -1324,9 +1351,7 @@ static void handle_home_topic_payload(esp_mqtt_client_handle_t client,
     value[copy_len] = '\0';
     trim_payload_text(value);
 
-    const bool online = value[0] != '\0' && strcmp(value, "unavailable") != 0 &&
-                        strcmp(value, "unknown") != 0 && strcmp(value, "offline") != 0;
-    hapanel_runtime_set_home_entity(mqtt_runtime, subscription->entity, value, online);
+    hapanel_runtime_set_home_entity_payload(mqtt_runtime, subscription->entity, value);
     publish_device_state(client, true);
 }
 

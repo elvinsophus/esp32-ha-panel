@@ -48,6 +48,9 @@ void hapanel_runtime_set_home_entity(hapanel_runtime_t *runtime,
                                      hapanel_home_entity_id_t entity,
                                      const char *value,
                                      bool online);
+void hapanel_runtime_set_home_entity_payload(hapanel_runtime_t *runtime,
+                                             hapanel_home_entity_id_t entity,
+                                             const char *payload);
 void hapanel_runtime_request_refresh(hapanel_runtime_t *runtime);
 void hapanel_runtime_show_page(hapanel_runtime_t *runtime, hapanel_ui_page_id_t page);
 void hapanel_runtime_handle_ui_page_request(hapanel_runtime_t *runtime,

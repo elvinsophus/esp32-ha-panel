@@ -147,6 +147,24 @@ void hapanel_runtime_set_home_entity(hapanel_runtime_t *runtime,
     notify_status_changed(runtime);
 }
 
+void hapanel_runtime_set_home_entity_payload(hapanel_runtime_t *runtime,
+                                             hapanel_home_entity_id_t entity,
+                                             const char *payload)
+{
+    if (runtime == NULL) {
+        return;
+    }
+
+    lock_runtime(runtime);
+    const bool changed = hapanel_home_state_update_payload(&runtime->home_state, entity, payload);
+    unlock_runtime(runtime);
+    if (!changed) {
+        return;
+    }
+
+    notify_status_changed(runtime);
+}
+
 void hapanel_runtime_set_refresh_callback(hapanel_runtime_t *runtime,
                                           void (*callback)(void *context),
                                           void *context)
