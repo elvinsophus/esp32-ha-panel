@@ -59,6 +59,14 @@ menu "HAPanel MQTT"
             panel presses to automations without the firmware knowing entity
             command semantics yet.
 
+    config HAPANEL_MQTT_HOME_ACTION_STATE_TOPIC
+        string "MQTT Home action state topic"
+        default "hapanel/home/action/state"
+        help
+            Retained JSON topic with the latest Home detail row tap. This makes
+            panel-originated actions visible in Home Assistant diagnostics even
+            after HA reconnects.
+
     config HAPANEL_MQTT_COMMAND_TOPIC
         string "MQTT command topic"
         default "hapanel/device/command"

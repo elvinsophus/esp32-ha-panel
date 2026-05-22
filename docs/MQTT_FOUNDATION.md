@@ -80,6 +80,7 @@ homeassistant/binary_sensor/hapanel_ota_ready/config
 homeassistant/sensor/hapanel_ota_running_slot/config
 homeassistant/sensor/hapanel_ota_target_slot/config
 homeassistant/sensor/hapanel_last_command_result/config
+homeassistant/sensor/hapanel_last_home_action/config
 homeassistant/binary_sensor/hapanel_psram_ready/config
 homeassistant/button/hapanel_status_refresh/config
 homeassistant/button/hapanel_ui_refresh/config
@@ -98,7 +99,8 @@ The top-level `ui` object reports the requested page, rendered page, and layer
 for page-router bring-up. The top-level `home` object reports the current Home
 tile labels, values, online flags, and revisions.
 Home detail row taps publish non-retained action events to
-`CONFIG_HAPANEL_MQTT_HOME_ACTION_TOPIC`.
+`CONFIG_HAPANEL_MQTT_HOME_ACTION_TOPIC` and retain the latest action on
+`CONFIG_HAPANEL_MQTT_HOME_ACTION_STATE_TOPIC` for diagnostics.
 Wi-Fi, MQTT, and OTA are also exposed as top-level `wifi`, `mqtt`, and `ota`
 objects in the retained state payload so discovery templates do not depend on
 service-array ordering. The top-level `ota.preflight` object reports whether
@@ -234,6 +236,7 @@ CONFIG_HAPANEL_MQTT_HOME_SCENE_TOPIC    default hapanel/home/scene
 CONFIG_HAPANEL_MQTT_HOME_LIGHTS_TOPIC   default hapanel/home/lights
 CONFIG_HAPANEL_MQTT_HOME_CLIMATE_TOPIC  default hapanel/home/climate
 CONFIG_HAPANEL_MQTT_HOME_ACTION_TOPIC   default hapanel/home/action
+CONFIG_HAPANEL_MQTT_HOME_ACTION_STATE_TOPIC default hapanel/home/action/state
 ```
 
 The first line becomes the matching Home tile summary. Optional following lines
@@ -251,6 +254,10 @@ When a detail row is tapped, the panel publishes a non-retained event:
 ```json
 {"schema":"hapanel.home_action.v1","entity":"lights","category":"Lights","detail_index":0,"label":"Kitchen","value":"On","online":true}
 ```
+
+The same payload is retained on `hapanel/home/action/state` as the latest Home
+action. Home Assistant discovery exposes this as the `Last Home Action`
+diagnostic sensor.
 
 Manual publish example:
 
