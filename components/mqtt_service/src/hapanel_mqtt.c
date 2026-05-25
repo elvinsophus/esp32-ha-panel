@@ -721,6 +721,7 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
     char command_result_topic[128];
     char command_state_topic[128];
     char home_action_state_topic[128];
+    char home_command_state_topic[128];
     char availability_topic[128];
 
     json_escape(app->version, app_version, sizeof(app_version));
@@ -738,6 +739,9 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
     json_escape(CONFIG_HAPANEL_MQTT_HOME_ACTION_STATE_TOPIC,
                 home_action_state_topic,
                 sizeof(home_action_state_topic));
+    json_escape(CONFIG_HAPANEL_MQTT_HOME_COMMAND_STATE_TOPIC,
+                home_command_state_topic,
+                sizeof(home_command_state_topic));
     json_escape(CONFIG_HAPANEL_MQTT_AVAILABILITY_TOPIC,
                 availability_topic,
                 sizeof(availability_topic));
@@ -965,6 +969,22 @@ static void publish_home_assistant_discovery(esp_mqtt_client_handle_t client)
                 "\"json_attributes_topic\":\"%s\",%s}",
             .topic = home_action_state_topic,
             .attributes_topic = home_action_state_topic,
+        },
+        {
+            .component = "sensor",
+            .object_id = "hapanel_last_home_command",
+            .payload_format =
+                "{\"name\":\"Last Home Command\","
+                "\"unique_id\":\"%s_last_home_command\","
+                "\"entity_category\":\"diagnostic\","
+                "\"state_topic\":\"%s\","
+                "\"value_template\":\"{{ value_json.target ~ ' / ' ~ value_json.action }}\","
+                "\"availability_topic\":\"%s\","
+                "\"payload_available\":\"online\","
+                "\"payload_not_available\":\"offline\","
+                "\"json_attributes_topic\":\"%s\",%s}",
+            .topic = home_command_state_topic,
+            .attributes_topic = home_command_state_topic,
         },
         {
             .component = "button",

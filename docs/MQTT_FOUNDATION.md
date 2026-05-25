@@ -27,6 +27,8 @@ Current behavior:
   buttons that use the existing safe command topic
 - publishes retained Home Assistant MQTT discovery for a last-command-result
   diagnostic sensor backed by the retained command state topic
+- publishes retained Home Assistant MQTT discovery for last-home-action and
+  last-home-command diagnostic sensors backed by retained Home topics
 - subscribes to `CONFIG_HAPANEL_MQTT_COMMAND_TOPIC` for safe foundation
   commands
 - publishes non-retained command result JSON to
@@ -81,6 +83,7 @@ homeassistant/sensor/hapanel_ota_running_slot/config
 homeassistant/sensor/hapanel_ota_target_slot/config
 homeassistant/sensor/hapanel_last_command_result/config
 homeassistant/sensor/hapanel_last_home_action/config
+homeassistant/sensor/hapanel_last_home_command/config
 homeassistant/binary_sensor/hapanel_psram_ready/config
 homeassistant/button/hapanel_status_refresh/config
 homeassistant/button/hapanel_ui_refresh/config
@@ -105,6 +108,8 @@ If the tapped row includes an action target, the panel also publishes a
 non-retained command request to `CONFIG_HAPANEL_MQTT_HOME_COMMAND_TOPIC` for
 Home Assistant automations to execute. The latest request is also retained on
 `CONFIG_HAPANEL_MQTT_HOME_COMMAND_STATE_TOPIC` for diagnostics.
+Home Assistant discovery exposes both retained payloads as diagnostic sensors:
+`Last Home Action` and `Last Home Command`.
 Wi-Fi, MQTT, and OTA are also exposed as top-level `wifi`, `mqtt`, and `ota`
 objects in the retained state payload so discovery templates do not depend on
 service-array ordering. The top-level `ota.preflight` object reports whether
