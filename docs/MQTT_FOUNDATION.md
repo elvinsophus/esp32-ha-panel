@@ -101,6 +101,10 @@ tile labels, values, online flags, and revisions.
 Home detail row taps publish non-retained action events to
 `CONFIG_HAPANEL_MQTT_HOME_ACTION_TOPIC` and retain the latest action on
 `CONFIG_HAPANEL_MQTT_HOME_ACTION_STATE_TOPIC` for diagnostics.
+If the tapped row includes an action target, the panel also publishes a
+non-retained command request to `CONFIG_HAPANEL_MQTT_HOME_COMMAND_TOPIC` for
+Home Assistant automations to execute. The latest request is also retained on
+`CONFIG_HAPANEL_MQTT_HOME_COMMAND_STATE_TOPIC` for diagnostics.
 Wi-Fi, MQTT, and OTA are also exposed as top-level `wifi`, `mqtt`, and `ota`
 objects in the retained state payload so discovery templates do not depend on
 service-array ordering. The top-level `ota.preflight` object reports whether
@@ -237,6 +241,8 @@ CONFIG_HAPANEL_MQTT_HOME_LIGHTS_TOPIC   default hapanel/home/lights
 CONFIG_HAPANEL_MQTT_HOME_CLIMATE_TOPIC  default hapanel/home/climate
 CONFIG_HAPANEL_MQTT_HOME_ACTION_TOPIC   default hapanel/home/action
 CONFIG_HAPANEL_MQTT_HOME_ACTION_STATE_TOPIC default hapanel/home/action/state
+CONFIG_HAPANEL_MQTT_HOME_COMMAND_TOPIC  default hapanel/home/command
+CONFIG_HAPANEL_MQTT_HOME_COMMAND_STATE_TOPIC default hapanel/home/command/state
 ```
 
 The first line becomes the matching Home tile summary. Optional following lines
@@ -245,6 +251,18 @@ become detail rows on that category page. Detail rows accept either
 numbered details. Empty, `unknown`, `unavailable`, and `offline` summaries mark
 the category offline; any other summary marks it online.
 
+Rows can also include optional action metadata:
+
+```text
+Kitchen: On | light.kitchen | toggle
+Dining: Off | light.dining
+```
+
+The first metadata field is the target. The second field is the requested
+action and defaults to `toggle` when omitted. The panel does not execute Home
+Assistant services directly; it only publishes a structured request for HA
+automations or scripts to handle.
+
 This stays deliberately small: the firmware keeps a fixed number of detail
 rows per category and does not parse a large Home Assistant JSON object on the
 panel.
@@ -252,12 +270,21 @@ panel.
 When a detail row is tapped, the panel publishes a non-retained event:
 
 ```json
-{"schema":"hapanel.home_action.v1","entity":"lights","category":"Lights","detail_index":0,"label":"Kitchen","value":"On","online":true}
+{"schema":"hapanel.home_action.v1","entity":"lights","category":"Lights","detail_index":0,"label":"Kitchen","value":"On","target":"light.kitchen","action":"toggle","online":true}
 ```
 
 The same payload is retained on `hapanel/home/action/state` as the latest Home
 action. Home Assistant discovery exposes this as the `Last Home Action`
 diagnostic sensor.
+
+Rows with a non-empty target additionally publish a non-retained command request:
+
+```json
+{"schema":"hapanel.home_command.v1","entity":"lights","category":"Lights","detail_index":0,"label":"Kitchen","target":"light.kitchen","action":"toggle"}
+```
+
+The same command request payload is retained on
+`hapanel/home/command/state` for verification and diagnostics.
 
 Manual publish example:
 
@@ -271,7 +298,7 @@ Multi-line detail example:
 
 ```text
 Kitchen on
-Kitchen: On
-Dining: Off
-Hall: Off
+Kitchen: On | light.kitchen
+Dining: Off | light.dining
+Hall: Off | light.hall
 ```

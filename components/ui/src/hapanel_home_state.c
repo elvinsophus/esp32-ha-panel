@@ -44,6 +44,19 @@ static void copy_text(char *target, size_t target_size, const char *value)
     snprintf(target, target_size, "%s", value);
 }
 
+static void copy_optional_text(char *target, size_t target_size, const char *value)
+{
+    if (target_size == 0) {
+        return;
+    }
+
+    if (value == NULL) {
+        value = "";
+    }
+
+    snprintf(target, target_size, "%s", value);
+}
+
 static bool is_ascii_space(char value)
 {
     return value == ' ' || value == '\t' || value == '\r' || value == '\n';
@@ -88,6 +101,8 @@ static bool value_is_online(const char *value)
 static bool update_detail_item(hapanel_home_detail_item_t *item,
                                const char *label,
                                const char *value,
+                               const char *target,
+                               const char *action,
                                bool online)
 {
     if (item == NULL) {
@@ -96,16 +111,23 @@ static bool update_detail_item(hapanel_home_detail_item_t *item,
 
     char next_label[HAPANEL_HOME_DETAIL_LABEL_MAX];
     char next_value[HAPANEL_HOME_DETAIL_VALUE_MAX];
+    char next_target[HAPANEL_HOME_DETAIL_TARGET_MAX];
+    char next_action[HAPANEL_HOME_DETAIL_ACTION_MAX];
     copy_text(next_label, sizeof(next_label), label);
     copy_text(next_value, sizeof(next_value), value);
+    copy_optional_text(next_target, sizeof(next_target), target);
+    copy_text(next_action, sizeof(next_action), action != NULL && action[0] != '\0' ? action : "toggle");
 
     if (item->online == online && strcmp(item->label, next_label) == 0 &&
-        strcmp(item->value, next_value) == 0) {
+        strcmp(item->value, next_value) == 0 && strcmp(item->target, next_target) == 0 &&
+        strcmp(item->action, next_action) == 0) {
         return false;
     }
 
     copy_text(item->label, sizeof(item->label), next_label);
     copy_text(item->value, sizeof(item->value), next_value);
+    copy_optional_text(item->target, sizeof(item->target), next_target);
+    copy_text(item->action, sizeof(item->action), next_action);
     item->online = online;
     item->revision++;
     return true;
@@ -133,6 +155,10 @@ void hapanel_home_state_init(hapanel_home_state_t *state)
         copy_text(state->entities[i].details[0].value,
                   sizeof(state->entities[i].details[0].value),
                   DEFAULT_ENTITIES[i].detail_value);
+        state->entities[i].details[0].target[0] = '\0';
+        copy_text(state->entities[i].details[0].action,
+                  sizeof(state->entities[i].details[0].action),
+                  "toggle");
         state->entities[i].details[0].online = false;
         state->entities[i].details[0].revision = 1;
         state->entities[i].online = false;
@@ -183,7 +209,8 @@ bool hapanel_home_state_update_payload(hapanel_home_state_t *state,
     bool changed = hapanel_home_state_update(state, entity, summary, online);
 
     if (line_end == NULL) {
-        const bool detail_changed = update_detail_item(&item->details[0], "Current", summary, online);
+        const bool detail_changed =
+            update_detail_item(&item->details[0], "Current", summary, "", "toggle", online);
         if (detail_changed) {
             item->revision++;
             state->revision++;
@@ -208,24 +235,57 @@ bool hapanel_home_state_update_payload(hapanel_home_state_t *state,
         line_end = strpbrk(cursor, "\r\n");
         const size_t line_len = line_end != NULL ? (size_t)(line_end - cursor) : strlen(cursor);
 
-        const char *separator = memchr(cursor, ':', line_len);
-        if (separator == NULL) {
-            separator = memchr(cursor, '=', line_len);
-        }
-
         char detail_label[HAPANEL_HOME_DETAIL_LABEL_MAX];
         char detail_value[HAPANEL_HOME_DETAIL_VALUE_MAX];
+        char detail_target[HAPANEL_HOME_DETAIL_TARGET_MAX];
+        char detail_action[HAPANEL_HOME_DETAIL_ACTION_MAX];
+        detail_target[0] = '\0';
+        copy_text(detail_action, sizeof(detail_action), "toggle");
+
+        const char *field_start = cursor;
+        size_t field_len = line_len;
+        const char *metadata = memchr(cursor, '|', line_len);
+        if (metadata != NULL) {
+            field_len = (size_t)(metadata - cursor);
+
+            const char *target_start = metadata + 1;
+            size_t target_len = line_len - field_len - 1;
+            const char *action_separator = memchr(target_start, '|', target_len);
+            if (action_separator != NULL) {
+                target_len = (size_t)(action_separator - target_start);
+                copy_trimmed_text(detail_action,
+                                  sizeof(detail_action),
+                                  action_separator + 1,
+                                  line_len - (size_t)(action_separator - cursor) - 1);
+            }
+            copy_trimmed_text(detail_target, sizeof(detail_target), target_start, target_len);
+            if (strcmp(detail_action, "Unknown") == 0) {
+                copy_text(detail_action, sizeof(detail_action), "toggle");
+            }
+            if (strcmp(detail_target, "Unknown") == 0) {
+                detail_target[0] = '\0';
+            }
+        }
+
+        const char *separator = memchr(field_start, ':', field_len);
+        if (separator == NULL) {
+            separator = memchr(field_start, '=', field_len);
+        }
+
         if (separator != NULL) {
-            copy_trimmed_text(detail_label, sizeof(detail_label), cursor, (size_t)(separator - cursor));
+            copy_trimmed_text(detail_label,
+                              sizeof(detail_label),
+                              field_start,
+                              (size_t)(separator - field_start));
             copy_trimmed_text(detail_value,
                               sizeof(detail_value),
                               separator + 1,
-                              line_len - (size_t)(separator - cursor) - 1);
+                              field_len - (size_t)(separator - field_start) - 1);
         } else {
             char fallback_label[HAPANEL_HOME_DETAIL_LABEL_MAX];
             snprintf(fallback_label, sizeof(fallback_label), "Detail %u", (unsigned)(parsed_count + 1));
             copy_text(detail_label, sizeof(detail_label), fallback_label);
-            copy_trimmed_text(detail_value, sizeof(detail_value), cursor, line_len);
+            copy_trimmed_text(detail_value, sizeof(detail_value), field_start, field_len);
         }
 
         if (strcmp(detail_label, "Unknown") != 0 || strcmp(detail_value, "Unknown") != 0) {
@@ -233,6 +293,8 @@ bool hapanel_home_state_update_payload(hapanel_home_state_t *state,
                 update_detail_item(&item->details[parsed_count],
                                    detail_label,
                                    detail_value,
+                                   detail_target,
+                                   detail_action,
                                    online && value_is_online(detail_value));
             if (detail_changed) {
                 item->revision++;
@@ -253,7 +315,8 @@ bool hapanel_home_state_update_payload(hapanel_home_state_t *state,
 
     if (parsed_count == 0) {
         parsed_count = 1;
-        const bool detail_changed = update_detail_item(&item->details[0], "Current", summary, online);
+        const bool detail_changed =
+            update_detail_item(&item->details[0], "Current", summary, "", "toggle", online);
         if (detail_changed) {
             item->revision++;
             state->revision++;

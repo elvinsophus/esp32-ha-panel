@@ -10,6 +10,8 @@
 #define HAPANEL_HOME_DETAIL_ITEM_COUNT 3
 #define HAPANEL_HOME_DETAIL_LABEL_MAX 18
 #define HAPANEL_HOME_DETAIL_VALUE_MAX 48
+#define HAPANEL_HOME_DETAIL_TARGET_MAX 48
+#define HAPANEL_HOME_DETAIL_ACTION_MAX 16
 
 typedef enum {
     HAPANEL_HOME_ENTITY_SCENE,
@@ -20,6 +22,8 @@ typedef enum {
 typedef struct {
     char label[HAPANEL_HOME_DETAIL_LABEL_MAX];
     char value[HAPANEL_HOME_DETAIL_VALUE_MAX];
+    char target[HAPANEL_HOME_DETAIL_TARGET_MAX];
+    char action[HAPANEL_HOME_DETAIL_ACTION_MAX];
     bool online;
     uint32_t revision;
 } hapanel_home_detail_item_t;
@@ -44,6 +48,8 @@ typedef struct {
     char category[HAPANEL_HOME_ENTITY_LABEL_MAX];
     char label[HAPANEL_HOME_DETAIL_LABEL_MAX];
     char value[HAPANEL_HOME_DETAIL_VALUE_MAX];
+    char target[HAPANEL_HOME_DETAIL_TARGET_MAX];
+    char action[HAPANEL_HOME_DETAIL_ACTION_MAX];
     bool online;
     uint32_t revision;
 } hapanel_home_action_t;

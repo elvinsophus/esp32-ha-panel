@@ -67,6 +67,22 @@ menu "HAPanel MQTT"
             panel-originated actions visible in Home Assistant diagnostics even
             after HA reconnects.
 
+    config HAPANEL_MQTT_HOME_COMMAND_TOPIC
+        string "MQTT Home command request topic"
+        default "hapanel/home/command"
+        help
+            Non-retained JSON topic published when a tapped Home detail row has
+            an action target. Home Assistant automations can subscribe to this
+            topic and decide how to execute the requested target/action pair.
+
+    config HAPANEL_MQTT_HOME_COMMAND_STATE_TOPIC
+        string "MQTT Home command request state topic"
+        default "hapanel/home/command/state"
+        help
+            Retained JSON topic with the latest Home command request. This is
+            for diagnostics and test verification; Home Assistant should still
+            execute commands from the non-retained request topic.
+
     config HAPANEL_MQTT_COMMAND_TOPIC
         string "MQTT command topic"
         default "hapanel/device/command"

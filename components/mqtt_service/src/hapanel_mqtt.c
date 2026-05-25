@@ -458,16 +458,23 @@ static bool append_home_state_object(char *buffer,
             const hapanel_home_detail_item_t *item = &entity->details[detail];
             char detail_label[HAPANEL_HOME_DETAIL_LABEL_MAX * 2];
             char detail_value[HAPANEL_HOME_DETAIL_VALUE_MAX * 2];
+            char detail_target[HAPANEL_HOME_DETAIL_TARGET_MAX * 2];
+            char detail_action[HAPANEL_HOME_DETAIL_ACTION_MAX * 2];
             json_escape(item->label, detail_label, sizeof(detail_label));
             json_escape(item->value, detail_value, sizeof(detail_value));
+            json_escape(item->target, detail_target, sizeof(detail_target));
+            json_escape(item->action, detail_action, sizeof(detail_action));
             if (!append_text(buffer,
                              buffer_size,
                              offset,
-                             "%s{\"label\":\"%s\",\"value\":\"%s\",\"online\":%s,"
+                             "%s{\"label\":\"%s\",\"value\":\"%s\",\"target\":\"%s\","
+                             "\"action\":\"%s\",\"online\":%s,"
                              "\"revision\":%" PRIu32 "}",
                              detail == 0 ? "" : ",",
                              detail_label,
                              detail_value,
+                             detail_target,
+                             detail_action,
                              item->online ? "true" : "false",
                              item->revision)) {
                 return false;
@@ -1291,9 +1298,13 @@ static void home_action_callback(const hapanel_home_action_t *action, void *cont
     char category[HAPANEL_HOME_ENTITY_LABEL_MAX * 2];
     char label[HAPANEL_HOME_DETAIL_LABEL_MAX * 2];
     char value[HAPANEL_HOME_DETAIL_VALUE_MAX * 2];
+    char target[HAPANEL_HOME_DETAIL_TARGET_MAX * 2];
+    char requested_action[HAPANEL_HOME_DETAIL_ACTION_MAX * 2];
     json_escape(action->category, category, sizeof(category));
     json_escape(action->label, label, sizeof(label));
     json_escape(action->value, value, sizeof(value));
+    json_escape(action->target, target, sizeof(target));
+    json_escape(action->action, requested_action, sizeof(requested_action));
 
     char payload[384];
     const int payload_len = snprintf(payload,
@@ -1304,6 +1315,8 @@ static void home_action_callback(const hapanel_home_action_t *action, void *cont
                                      "\"detail_index\":%u,"
                                      "\"label\":\"%s\","
                                      "\"value\":\"%s\","
+                                     "\"target\":\"%s\","
+                                     "\"action\":\"%s\","
                                      "\"online\":%s,"
                                      "\"revision\":%" PRIu32 ","
                                      "\"uptime_ms\":%" PRIu64 "}",
@@ -1312,6 +1325,8 @@ static void home_action_callback(const hapanel_home_action_t *action, void *cont
                                      (unsigned)action->detail_index,
                                      label,
                                      value,
+                                     target,
+                                     requested_action,
                                      action->online ? "true" : "false",
                                      action->revision,
                                      (uint64_t)(esp_timer_get_time() / 1000));
@@ -1353,6 +1368,69 @@ static void home_action_callback(const hapanel_home_action_t *action, void *cont
                  home_entity_key(action->entity),
                  (unsigned)action->detail_index,
                  state_msg_id);
+    }
+
+    if (action->target[0] == '\0') {
+        return;
+    }
+
+    char request_payload[384];
+    const int request_payload_len = snprintf(request_payload,
+                                             sizeof(request_payload),
+                                             "{\"schema\":\"hapanel.home_command.v1\","
+                                             "\"entity\":\"%s\","
+                                             "\"category\":\"%s\","
+                                             "\"detail_index\":%u,"
+                                             "\"label\":\"%s\","
+                                             "\"target\":\"%s\","
+                                             "\"action\":\"%s\","
+                                             "\"uptime_ms\":%" PRIu64 "}",
+                                             home_entity_key(action->entity),
+                                             category,
+                                             (unsigned)action->detail_index,
+                                             label,
+                                             target,
+                                             requested_action,
+                                             (uint64_t)(esp_timer_get_time() / 1000));
+
+    if (request_payload_len < 0 || request_payload_len >= (int)sizeof(request_payload)) {
+        ESP_LOGW(TAG, "MQTT Home command request payload truncated; skipping publish");
+        return;
+    }
+
+    const int request_msg_id = esp_mqtt_client_publish(mqtt_client,
+                                                       CONFIG_HAPANEL_MQTT_HOME_COMMAND_TOPIC,
+                                                       request_payload,
+                                                       request_payload_len,
+                                                       0,
+                                                       0);
+    if (request_msg_id < 0) {
+        ESP_LOGW(TAG, "Failed to publish MQTT Home command request");
+    } else {
+        ESP_LOGI(TAG,
+                 "Published MQTT Home command request: topic=%s target=%s action=%s msg_id=%d",
+                 CONFIG_HAPANEL_MQTT_HOME_COMMAND_TOPIC,
+                 target,
+                 requested_action,
+                 request_msg_id);
+    }
+
+    const int request_state_msg_id =
+        esp_mqtt_client_publish(mqtt_client,
+                                CONFIG_HAPANEL_MQTT_HOME_COMMAND_STATE_TOPIC,
+                                request_payload,
+                                request_payload_len,
+                                0,
+                                1);
+    if (request_state_msg_id < 0) {
+        ESP_LOGW(TAG, "Failed to publish MQTT Home command request state");
+    } else {
+        ESP_LOGI(TAG,
+                 "Published MQTT Home command request state: topic=%s target=%s action=%s msg_id=%d",
+                 CONFIG_HAPANEL_MQTT_HOME_COMMAND_STATE_TOPIC,
+                 target,
+                 requested_action,
+                 request_state_msg_id);
     }
 }
 

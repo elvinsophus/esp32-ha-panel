@@ -268,6 +268,8 @@ void hapanel_runtime_handle_home_action_request(hapanel_runtime_t *runtime,
     snprintf(action.category, sizeof(action.category), "%s", category->label);
     snprintf(action.label, sizeof(action.label), "%s", detail->label);
     snprintf(action.value, sizeof(action.value), "%s", detail->value);
+    snprintf(action.target, sizeof(action.target), "%s", detail->target);
+    snprintf(action.action, sizeof(action.action), "%s", detail->action);
     action.online = detail->online;
     action.revision = detail->revision;
     unlock_runtime(runtime);
