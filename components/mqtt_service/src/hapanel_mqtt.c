@@ -34,7 +34,7 @@ static bool ota_update_task_running;
 static uint32_t published_state_revision;
 
 enum {
-    HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE = 4096,
+    HAPANEL_MQTT_DEVICE_STATE_PAYLOAD_SIZE = 6144,
 };
 
 typedef struct {

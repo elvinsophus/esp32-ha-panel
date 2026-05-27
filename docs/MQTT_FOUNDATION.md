@@ -271,9 +271,9 @@ See [HA_INTEGRATION.md](HA_INTEGRATION.md) and
 [examples/home-assistant/hapanel_command_bridge.yaml](../examples/home-assistant/hapanel_command_bridge.yaml)
 for the first Home Assistant automation bridge.
 
-This stays deliberately small: the firmware keeps a fixed number of detail
-rows per category and does not parse a large Home Assistant JSON object on the
-panel.
+This stays deliberately small: the firmware keeps up to six fixed detail rows
+per category and does not parse a large Home Assistant JSON object on the
+panel. Detail pages scroll when the row count exceeds the visible area.
 
 When a detail row is tapped, the panel publishes a non-retained event:
 

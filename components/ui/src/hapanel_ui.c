@@ -41,6 +41,7 @@ typedef struct {
     lv_obj_t *psram_label;
     lv_obj_t *value_label;
     lv_obj_t *accent_dot;
+    lv_obj_t *detail_list;
     lv_obj_t *detail_dots[HAPANEL_HOME_DETAIL_ITEM_COUNT];
     lv_obj_t *detail_labels[HAPANEL_HOME_DETAIL_ITEM_COUNT];
     lv_obj_t *detail_values[HAPANEL_HOME_DETAIL_ITEM_COUNT];
@@ -554,7 +555,7 @@ static void create_home_detail_row(lv_obj_t *parent,
     lv_obj_t *row = lv_obj_create(parent);
     lv_obj_remove_style_all(row);
     lv_obj_set_width(row, LV_PCT(100));
-    lv_obj_set_height(row, 44);
+    lv_obj_set_height(row, 40);
     lv_obj_set_layout(row, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
@@ -595,7 +596,7 @@ static void create_home_detail_row(lv_obj_t *parent,
                                                ? lv_color_hex(profile->theme.text_primary)
                                                : lv_color_hex(profile->theme.text_muted));
     lv_label_set_long_mode(value, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(value, 230);
+    lv_obj_set_width(value, 226);
     lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, 0);
     make_home_action_target(row, index);
     make_home_action_target(left, index);
@@ -909,7 +910,7 @@ static void show_home_detail_page(const hapanel_ui_status_t *status,
     lv_obj_t *panel = create_panel(root);
     lv_obj_set_height(panel, 250);
     lv_obj_set_style_pad_all(panel, profile->spacing.md, 0);
-    lv_obj_set_style_pad_row(panel, profile->spacing.md, 0);
+    lv_obj_set_style_pad_row(panel, profile->spacing.sm, 0);
 
     home_detail_view.accent_dot = lv_obj_create(panel);
     lv_obj_remove_style_all(home_detail_view.accent_dot);
@@ -929,14 +930,29 @@ static void show_home_detail_page(const hapanel_ui_status_t *status,
                                     : lv_color_hex(profile->theme.text_muted));
     lv_label_set_long_mode(home_detail_view.value_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(home_detail_view.value_label, LV_PCT(100));
+    lv_obj_set_height(home_detail_view.value_label, 48);
     lv_obj_set_style_text_line_space(home_detail_view.value_label, 3, 0);
+
+    home_detail_view.detail_list = lv_obj_create(panel);
+    lv_obj_remove_style_all(home_detail_view.detail_list);
+    lv_obj_set_width(home_detail_view.detail_list, LV_PCT(100));
+    lv_obj_set_height(home_detail_view.detail_list, 132);
+    lv_obj_set_scroll_dir(home_detail_view.detail_list, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(home_detail_view.detail_list, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_set_layout(home_detail_view.detail_list, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(home_detail_view.detail_list, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(home_detail_view.detail_list,
+                          LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_row(home_detail_view.detail_list, 6, 0);
 
     const size_t detail_count = entity != NULL ? entity->detail_count : 0;
     home_detail_view.detail_count = detail_count < HAPANEL_HOME_DETAIL_ITEM_COUNT
                                         ? detail_count
                                         : HAPANEL_HOME_DETAIL_ITEM_COUNT;
     for (size_t i = 0; i < home_detail_view.detail_count; ++i) {
-        create_home_detail_row(panel,
+        create_home_detail_row(home_detail_view.detail_list,
                                entity != NULL ? &entity->details[i] : NULL,
                                i,
                                lv_color_hex(entity_accents[entity_id]));
