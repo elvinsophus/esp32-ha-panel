@@ -267,6 +267,9 @@ The first metadata field is the target. The second field is the requested
 action and defaults to `toggle` when omitted. The panel does not execute Home
 Assistant services directly; it only publishes a structured request for HA
 automations or scripts to handle.
+See [HA_INTEGRATION.md](HA_INTEGRATION.md) and
+[examples/home-assistant/hapanel_command_bridge.yaml](../examples/home-assistant/hapanel_command_bridge.yaml)
+for the first Home Assistant automation bridge.
 
 This stays deliberately small: the firmware keeps a fixed number of detail
 rows per category and does not parse a large Home Assistant JSON object on the

@@ -1,0 +1,47 @@
+# Home Assistant package example for HAPanel command requests.
+#
+# Place this file under your Home Assistant packages directory, or copy the
+# automation into automations.yaml. The panel publishes requests only; Home
+# Assistant remains responsible for deciding which services are allowed.
+
+automation:
+  - id: hapanel_home_command_bridge
+    alias: HAPanel Home command bridge
+    description: Execute safe HAPanel Home detail-row command requests.
+    mode: queued
+    max: 10
+
+    triggers:
+      - trigger: mqtt
+        topic: hapanel/home/command
+
+    variables:
+      command: "{{ trigger.payload_json | default({}) }}"
+      schema: "{{ command.schema | default('') }}"
+      target_entity: "{{ command.target | default('') }}"
+      requested_action: "{{ command.action | default('toggle') }}"
+      target_domain: "{{ target_entity.split('.')[0] if '.' in target_entity else '' }}"
+      target_object: "{{ target_entity.split('.')[1] if '.' in target_entity else '' }}"
+      service_action: >-
+        {% if target_domain in ['scene', 'script'] and requested_action in ['activate', 'turn_on', 'toggle'] %}
+          turn_on
+        {% elif requested_action in ['toggle', 'turn_on', 'turn_off'] %}
+          {{ requested_action }}
+        {% else %}
+          reject
+        {% endif %}
+
+    conditions:
+      - condition: template
+        value_template: "{{ schema == 'hapanel.home_command.v1' }}"
+      - condition: template
+        value_template: "{{ target_domain in ['light', 'switch', 'fan', 'input_boolean', 'scene', 'script'] }}"
+      - condition: template
+        value_template: "{{ target_object | length > 0 }}"
+      - condition: template
+        value_template: "{{ service_action != 'reject' }}"
+
+    actions:
+      - action: "homeassistant.{{ service_action }}"
+        target:
+          entity_id: "{{ target_entity }}"
