@@ -302,6 +302,9 @@ Manual publish example:
 .\tools\mqtt_publish.ps1 -Topic hapanel/home/climate -Payload "22.5 C" -Retain
 ```
 
+For Home Assistant-driven light state publication, see
+[examples/home-assistant/hapanel_lights_state_publisher.yaml](../examples/home-assistant/hapanel_lights_state_publisher.yaml).
+
 Multi-line detail example:
 
 ```text

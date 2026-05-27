@@ -1,0 +1,38 @@
+# Home Assistant package example for publishing HAPanel Lights state.
+#
+# Replace the entity IDs below with real lights from your Home Assistant
+# instance. The panel consumes this compact retained text payload; it does not
+# parse Home Assistant's full state model.
+
+automation:
+  - id: hapanel_lights_state_publisher
+    alias: HAPanel publish Lights state
+    description: Publish compact retained Lights rows for the HAPanel Home page.
+    mode: restart
+
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: state
+        entity_id:
+          - light.kitchen
+          - light.dining
+          - light.hall
+          - light.desk
+          - light.porch
+          - light.bedroom
+
+    actions:
+      - action: mqtt.publish
+        data:
+          topic: hapanel/home/lights
+          retain: true
+          qos: 0
+          payload: |-
+            {{ expand('light.kitchen', 'light.dining', 'light.hall', 'light.desk', 'light.porch', 'light.bedroom') | selectattr('state', 'eq', 'on') | list | count }} lights on
+            Kitchen: {{ 'On' if is_state('light.kitchen', 'on') else 'Off' }} | light.kitchen | toggle
+            Dining: {{ 'On' if is_state('light.dining', 'on') else 'Off' }} | light.dining | toggle
+            Hall: {{ 'On' if is_state('light.hall', 'on') else 'Off' }} | light.hall | toggle
+            Desk: {{ 'On' if is_state('light.desk', 'on') else 'Off' }} | light.desk | toggle
+            Porch: {{ 'On' if is_state('light.porch', 'on') else 'Off' }} | light.porch | toggle
+            Bedroom: {{ 'On' if is_state('light.bedroom', 'on') else 'Off' }} | light.bedroom | toggle

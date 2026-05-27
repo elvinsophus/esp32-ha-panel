@@ -37,11 +37,16 @@ only `hapanel.home_command.v1`, limits targets to common controllable domains,
 and maps `toggle`, `turn_on`, `turn_off`, and scene/script `activate` requests
 to generic `homeassistant.*` actions.
 
+Use [examples/home-assistant/hapanel_lights_state_publisher.yaml](../examples/home-assistant/hapanel_lights_state_publisher.yaml)
+as the first state publisher package. It watches a small fixed set of HA light
+entities and publishes a retained `hapanel/home/lights` payload whenever one
+changes or Home Assistant starts.
+
 This keeps the trust boundary simple:
 - firmware publishes intent
 - Home Assistant validates the target and action
 - Home Assistant executes the service
-- retained entity state topics update the panel afterwards
+- Home Assistant publishes retained entity state topics back to the panel
 
 ## Example Detail Payload
 
@@ -58,3 +63,10 @@ Evening: Ready | scene.evening | activate
 The first line is the tile summary. Each following row is displayed on the
 detail page. The first metadata field is the Home Assistant target entity. The
 second metadata field is optional and defaults to `toggle` in firmware.
+
+The first working Lights loop is:
+- `hapanel_lights_state_publisher.yaml` publishes retained light rows
+- the panel displays them on the Home and Lights pages
+- tapping a row publishes a command request to `hapanel/home/command`
+- `hapanel_command_bridge.yaml` validates and executes the request
+- the changed HA light state causes the retained Lights payload to update again
