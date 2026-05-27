@@ -42,6 +42,7 @@ typedef struct {
     lv_obj_t *value_label;
     lv_obj_t *accent_dot;
     lv_obj_t *detail_list;
+    lv_obj_t *detail_rows[HAPANEL_HOME_DETAIL_ITEM_COUNT];
     lv_obj_t *detail_dots[HAPANEL_HOME_DETAIL_ITEM_COUNT];
     lv_obj_t *detail_labels[HAPANEL_HOME_DETAIL_ITEM_COUNT];
     lv_obj_t *detail_values[HAPANEL_HOME_DETAIL_ITEM_COUNT];
@@ -393,6 +394,85 @@ static void make_home_action_target(lv_obj_t *obj, size_t detail_index)
     lv_obj_set_style_bg_opa(obj, LV_OPA_30, LV_STATE_PRESSED);
 }
 
+static bool text_is_on_state(const char *value)
+{
+    return value != NULL &&
+           (strcmp(value, "On") == 0 || strcmp(value, "on") == 0 || strcmp(value, "ON") == 0 ||
+            strcmp(value, "Active") == 0 || strcmp(value, "active") == 0 ||
+            strcmp(value, "ACTIVE") == 0);
+}
+
+static bool text_is_off_state(const char *value)
+{
+    return value != NULL &&
+           (strcmp(value, "Off") == 0 || strcmp(value, "off") == 0 || strcmp(value, "OFF") == 0 ||
+            strcmp(value, "Inactive") == 0 || strcmp(value, "inactive") == 0 ||
+            strcmp(value, "INACTIVE") == 0);
+}
+
+static bool home_detail_row_is_lit(const hapanel_home_detail_item_t *item)
+{
+    return item != NULL && item->online && home_detail_view.entity == HAPANEL_HOME_ENTITY_LIGHTS &&
+           text_is_on_state(item->value);
+}
+
+static bool home_detail_row_is_light_off(const hapanel_home_detail_item_t *item)
+{
+    return item != NULL && item->online && home_detail_view.entity == HAPANEL_HOME_ENTITY_LIGHTS &&
+           text_is_off_state(item->value);
+}
+
+static void style_home_detail_row(lv_obj_t *row,
+                                  lv_obj_t *dot,
+                                  lv_obj_t *value,
+                                  const hapanel_home_detail_item_t *item,
+                                  lv_color_t accent)
+{
+    const hapanel_profile_t *profile = ui_profile();
+    const bool is_light_page = home_detail_view.entity == HAPANEL_HOME_ENTITY_LIGHTS;
+    const bool is_lit = home_detail_row_is_lit(item);
+    const bool is_light_off = home_detail_row_is_light_off(item);
+
+    if (row != NULL) {
+        lv_obj_set_style_radius(row, profile->radius.sm, 0);
+        lv_obj_set_style_pad_hor(row, profile->spacing.xs, 0);
+        lv_obj_set_style_border_width(row, is_light_page ? 1 : 0, 0);
+        lv_obj_set_style_border_color(row,
+                                      is_lit ? accent : lv_color_hex(profile->theme.surface_border),
+                                      0);
+        lv_obj_set_style_bg_color(row,
+                                  is_lit ? accent : lv_color_hex(profile->theme.surface),
+                                  0);
+        lv_obj_set_style_bg_opa(row, is_lit ? LV_OPA_20 : (is_light_page ? LV_OPA_50 : LV_OPA_TRANSP), 0);
+    }
+
+    if (dot != NULL) {
+        lv_obj_set_style_bg_color(dot,
+                                  is_lit ? accent
+                                         : (item != NULL && item->online
+                                                ? lv_color_hex(profile->theme.text_muted)
+                                                : lv_color_hex(profile->theme.status_offline)),
+                                  0);
+    }
+
+    if (value != NULL) {
+        lv_obj_set_style_radius(value, is_light_page ? 13 : 0, 0);
+        lv_obj_set_style_pad_hor(value, is_light_page ? 10 : 0, 0);
+        lv_obj_set_style_bg_color(value,
+                                  is_lit ? accent : lv_color_hex(profile->theme.surface_border),
+                                  0);
+        lv_obj_set_style_bg_opa(value, is_light_page ? (is_lit ? LV_OPA_30 : LV_OPA_20) : LV_OPA_TRANSP, 0);
+        lv_obj_set_style_text_color(value,
+                                    is_lit ? lv_color_hex(profile->theme.text_primary)
+                                           : (is_light_off
+                                                  ? lv_color_hex(profile->theme.text_muted)
+                                                  : (item != NULL && item->online
+                                                         ? lv_color_hex(profile->theme.text_primary)
+                                                         : lv_color_hex(profile->theme.text_muted))),
+                                    0);
+    }
+}
+
 static void gesture_event_cb(lv_event_t *event)
 {
     if (lv_event_get_code(event) != LV_EVENT_GESTURE) {
@@ -551,6 +631,7 @@ static void create_home_detail_row(lv_obj_t *parent,
                                    lv_color_t accent)
 {
     const hapanel_profile_t *profile = ui_profile();
+    const bool is_light_page = home_detail_view.entity == HAPANEL_HOME_ENTITY_LIGHTS;
 
     lv_obj_t *row = lv_obj_create(parent);
     lv_obj_remove_style_all(row);
@@ -564,7 +645,7 @@ static void create_home_detail_row(lv_obj_t *parent,
     lv_obj_t *left = lv_obj_create(row);
     lv_obj_remove_style_all(left);
     lv_obj_set_height(left, LV_SIZE_CONTENT);
-    lv_obj_set_width(left, 132);
+    lv_obj_set_width(left, is_light_page ? 184 : 132);
     lv_obj_set_layout(left, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(left, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(left, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
@@ -587,7 +668,7 @@ static void create_home_detail_row(lv_obj_t *parent,
                                            item != NULL ? item->label : "Detail",
                                            lv_color_hex(profile->theme.text_muted));
     lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(label, 104);
+    lv_obj_set_width(label, is_light_page ? 156 : 104);
 
     lv_obj_t *value = create_dynamic_label(row,
                                            item != NULL ? item->label : "Detail",
@@ -596,8 +677,10 @@ static void create_home_detail_row(lv_obj_t *parent,
                                                ? lv_color_hex(profile->theme.text_primary)
                                                : lv_color_hex(profile->theme.text_muted));
     lv_label_set_long_mode(value, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(value, 226);
-    lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_width(value, is_light_page ? 82 : 226);
+    lv_obj_set_height(value, is_light_page ? 26 : LV_SIZE_CONTENT);
+    lv_obj_set_style_text_align(value, is_light_page ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_RIGHT, 0);
+    style_home_detail_row(row, dot, value, item, accent);
     make_home_action_target(row, index);
     make_home_action_target(left, index);
     make_home_action_target(dot, index);
@@ -605,6 +688,7 @@ static void create_home_detail_row(lv_obj_t *parent,
     make_home_action_target(value, index);
 
     if (index < HAPANEL_HOME_DETAIL_ITEM_COUNT) {
+        home_detail_view.detail_rows[index] = row;
         home_detail_view.detail_dots[index] = dot;
         home_detail_view.detail_labels[index] = label;
         home_detail_view.detail_values[index] = value;
@@ -1270,6 +1354,12 @@ static void refresh_home_detail_page(const hapanel_ui_status_t *status)
             lv_label_set_text(home_detail_view.detail_values[i], value_text);
             lv_obj_set_style_text_color(home_detail_view.detail_values[i], item_color, 0);
         }
+
+        style_home_detail_row(home_detail_view.detail_rows[i],
+                              home_detail_view.detail_dots[i],
+                              home_detail_view.detail_values[i],
+                              item,
+                              lv_color_hex(entity_accents[home_detail_view.entity]));
     }
 }
 
